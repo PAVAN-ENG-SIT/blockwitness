@@ -1,8 +1,3 @@
-Got you.
-Here is a **super short, localhost-only setup + run guide**, inside **one code block**, ready to paste.
-
-No ngrok, no phone setup — just localhost.
-
 ---
 
 # Localhost Installation & Running Instructions
