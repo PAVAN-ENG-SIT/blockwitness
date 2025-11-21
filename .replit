@@ -16,23 +16,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Backend"
+args = "Frontend"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Frontend"
-
-[[workflows.workflow]]
-name = "Backend"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend && python app.py"
-waitForPort = 8000
+args = "Backend"
 
 [[workflows.workflow]]
 name = "Frontend"
@@ -40,21 +28,37 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && VITE_API_URL=https://87536414-c678-4733-86eb-e077db8e6dca-00-2gtp428ojxetj.pike.replit.dev/api npm run dev"
+args = "cd frontend && npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow]]
+name = "Backend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python -c \"from app import init_db; init_db()\" && gunicorn --bind 0.0.0.0:8000 --workers 2 app:app"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8000
-externalPort = 8000
-exposeLocalhost = true
+localPort = 36049
+externalPort = 3000
 
 [[ports]]
-localPort = 41767
-externalPort = 3000
+localPort = 8000
+externalPort = 8000
+
+[deployment]
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd backend && python app.py & cd frontend && npm run preview -- --port 5000 --host 0.0.0.0"]
+build = ["bash", "-c", "cd frontend && npm run build"]
