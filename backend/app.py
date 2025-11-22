@@ -1,6 +1,25 @@
+from flask import Flask
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+# ✅ Home route (safe to add here)
 @app.get("/")
 def home():
     return {"status": "BlockWitness backend running successfully!"}
+
+# ===================================
+# your other imports + routes below
+# ===================================
+
+from chain_utils import *
+from crypto_utils import *
+from db import *
+# ... etc ...
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=True, use_reloader=False)
 
 
 # backend/app.py
