@@ -27,7 +27,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py & cd frontend && npm run dev"
+args = "bash start.sh"
 waitForPort = 5000
 
 [[ports]]
@@ -36,15 +36,11 @@ externalPort = 80
 
 [[ports]]
 localPort = 8000
-externalPort = 8000
+externalPort = 9000
 
 [[ports]]
 localPort = 33101
 externalPort = 3000
-
-[[ports]]
-localPort = 37287
-externalPort = 3001
 
 [deployment]
 deploymentTarget = "autoscale"
