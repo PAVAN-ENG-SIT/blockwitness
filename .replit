@@ -50,6 +50,14 @@ outputType = "console"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 43713
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd backend && python app.py & cd frontend && npm run preview -- --port 5000 --host 0.0.0.0"]
