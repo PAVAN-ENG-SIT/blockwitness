@@ -1,39 +1,118 @@
-// frontend/src/App.jsx
 import React from "react";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import CreateReport from "./pages/CreateReport";
 import Explorer from "./pages/Explorer";
 import Verify from "./pages/Verify";
 import Search from "./pages/Search";
 import Timeline from "./pages/Timeline";
 
-export default function App(){
+function NavLink({ to, children, icon }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-slate-100">
-        <nav className="bg-white px-6 py-3 shadow">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="font-bold text-lg">BlockWitness</div>
-            <div className="flex gap-4 items-center">
-              <Link to="/" className="text-sm text-indigo-600">Create</Link>
-              <Link to="/explorer" className="text-sm text-indigo-600">Explorer</Link>
-              <Link to="/verify" className="text-sm text-indigo-600">Verify</Link>
-              <Link to="/search" className="text-sm text-indigo-600">Search</Link>
-              <Link to="/timeline" className="text-sm text-indigo-600">Timeline</Link>
+    <Link
+      to={to}
+      className={`
+        relative px-4 py-2 rounded-xl font-medium text-sm
+        transition-all duration-300 flex items-center gap-2
+        group overflow-hidden
+        ${isActive 
+          ? 'text-white bg-gradient-to-r from-primary-600 to-primary-500 shadow-lg shadow-primary-500/30' 
+          : 'text-dark-600 hover:text-primary-600 hover:bg-dark-100'
+        }
+      `}
+    >
+      {!isActive && (
+        <span className="absolute inset-0 bg-gradient-to-r from-primary-500/0 via-primary-500/10 to-primary-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
+      )}
+      {icon && <span className="relative z-10">{icon}</span>}
+      <span className="relative z-10">{children}</span>
+      {isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/50"></span>
+      )}
+    </Link>
+  );
+}
+
+function AppContent() {
+  return (
+    <div className="min-h-screen bg-gradient-mesh bg-dark-50">
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-dark-200/50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
+                  BlockWitness
+                </h1>
+                <p className="text-xs text-dark-500">Tamper-Proof Evidence Recorder</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <NavLink to="/" icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              }>
+                Create
+              </NavLink>
+              <NavLink to="/explorer" icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              }>
+                Explorer
+              </NavLink>
+              <NavLink to="/verify" icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }>
+                Verify
+              </NavLink>
+              <NavLink to="/search" icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              }>
+                Search
+              </NavLink>
+              <NavLink to="/timeline" icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }>
+                Timeline
+              </NavLink>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
 
-        <main className="max-w-6xl mx-auto py-8">
-          <Routes>
-            <Route path="/" element={<CreateReport />} />
-            <Route path="/explorer" element={<Explorer />} />
-            <Route path="/verify" element={<Verify />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/timeline" element={<Timeline />} />
-          </Routes>
-        </main>
-      </div>
+      <main className="max-w-7xl mx-auto px-6 py-8 animate-fade-in">
+        <Routes>
+          <Route path="/" element={<CreateReport />} />
+          <Route path="/explorer" element={<Explorer />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/timeline" element={<Timeline />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }
