@@ -1,5 +1,6 @@
 // frontend/src/api.js
-const API_BASE = "https://your-render-backend.onrender.com";
+const API_BASE = "https://blockwitness.onrender.com/api";
+
 
 
 async function fetchJson(url, opts = {}) {
