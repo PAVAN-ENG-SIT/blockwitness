@@ -1,5 +1,5 @@
 // frontend/src/api.js
-const API_BASE = "https://blockwitness.onrender.com/api";
+const API_BASE = "/api";
 
 
 
