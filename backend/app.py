@@ -1,14 +1,31 @@
+import os
 from sqlalchemy import create_engine
 
-import os
+
+from sqlalchemy import text
+
+@app.get("/db-test")
+def test_db():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "Database Connected"}
+    except Exception as e:
+        return {"status": "Database Error", "message": str(e)}
+
+
+
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 
 
+
+
 # backend/app.py
-import os
+
 import time
 import json
 import uuid
