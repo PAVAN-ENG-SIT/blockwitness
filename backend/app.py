@@ -1,10 +1,48 @@
+# backend/app.py
+
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+
+import time
+import json
+import uuid
+import hashlib
+import base64
+from io import BytesIO
+from pathlib import Path
+
+# Optional libs
+try:
+    import qrcode
+except Exception:
+    qrcode = None
 
 
-from sqlalchemy import text
+# ----------------------------------------
+# 1. DATABASE CONNECTION (PostgreSQL)
+# ----------------------------------------
 
-@app.get("/db-test")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
+
+
+# ----------------------------------------
+# 2. FLASK APP SETUP
+# ----------------------------------------
+
+app = Flask(__name__)
+CORS(app)
+
+
+# ----------------------------------------
+# 3. DB TEST ROUTE
+# ----------------------------------------
+
+@app.route("/db-test", methods=["GET"])
 def test_db():
     try:
         with engine.connect() as conn:
@@ -12,36 +50,6 @@ def test_db():
         return {"status": "Database Connected"}
     except Exception as e:
         return {"status": "Database Error", "message": str(e)}
-
-
-
-
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-
-
-
-
-# backend/app.py
-
-import time
-import json
-import uuid
-import hashlib
-import sqlite3
-import base64
-from io import BytesIO
-from pathlib import Path
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
-
-# Optional libs
-try:
-    import qrcode
-except Exception:
-    qrcode = None
 
 try:
     from reportlab.lib.pagesizes import A4
