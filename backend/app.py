@@ -1,39 +1,95 @@
+# backend/app.py
+
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,send_file
 from flask_cors import CORS
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, text
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
+from chain_utils import sha256_bytes, merkle_root
+from crypto_utils import sign_hex, verify_hex
 
-# -------------------------------------------------------------------
-# 1️⃣ POSTGRES CONNECTION (Render)
-# -------------------------------------------------------------------
+
+@app.route("/generate_certificate", methods=["POST"])
+def generate_certificate():
+    data = request.json
+    student_name = data.get("student_name")
+    course = data.get("course")
+    date = data.get("date")
+
+    if not all([student_name, course, date]):
+        return {"error": "Missing data"}, 400
+
+    # -----------------
+    # 1️⃣ Create PDF certificate
+    # -----------------
+    cert_content = f"Certificate of Completion\n\nStudent: {student_name}\nCourse: {course}\nDate: {date}"
+    
+    os.makedirs("certificates", exist_ok=True)
+    cert_file_path = os.path.join("certificates", f"{student_name}_certificate.pdf")
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=16)
+    pdf.multi_cell(0, 10, cert_content)
+    pdf.output(cert_file_path)
+
+    # -----------------
+    # 2️⃣ Compute hash of PDF
+    # -----------------
+    with open(cert_file_path, "rb") as f:
+        pdf_bytes = f.read()
+    cert_hash = sha256_bytes(pdf_bytes)
+
+    # -----------------
+    # 3️⃣ Sign the certificate hash
+    # -----------------
+    priv_key_path = os.path.join("keys", "issuer_priv.pem")  # Make sure your keys are here
+    signature_hex = sign_hex(priv_key_path, cert_hash)
+
+    # -----------------
+    # 4️⃣ Return PDF path, hash, and signature
+    # -----------------
+    return jsonify({
+        "certificate_file": cert_file_path,  # Frontend can use send_file
+        "hash": cert_hash,
+        "signature": signature_hex
+    })
+# Instead of returning path
+return send_file(cert_file_path, as_attachment=True)
+
+# -----------------------------
+# 1️⃣ PostgreSQL connection
+# -----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Fix SSL for Render PostgreSQL
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL environment variable not set")
+
+# Fix for Render
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
 engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
-Session = sessionmaker(bind=engine)
-session = Session()
+SessionLocal = sessionmaker(bind=engine)
 
 Base = declarative_base()
 
-# -------------------------------------------------------------------
-# 2️⃣ ORM MODELS (metadata renamed → block_metadata)
-# -------------------------------------------------------------------
+# -----------------------------
+# 2️⃣ Models
+# -----------------------------
 class Block(Base):
     __tablename__ = "blocks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    block_hash = Column(String(256), unique=True)
+    block_hash = Column(String(256), unique=True, nullable=False)
     previous_hash = Column(String(256))
     nonce = Column(String(256))
     data = Column(Text)
-    block_metadata = Column(Text)   # FIXED: renamed from "metadata"
+    block_metadata = Column(Text)
 
     transactions = relationship("Transaction", back_populates="block")
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -47,27 +103,24 @@ class Transaction(Base):
 
     block = relationship("Block", back_populates="transactions")
 
-# -------------------------------------------------------------------
-# 3️⃣ Create database tables (Auto)
-# -------------------------------------------------------------------
+
+# -----------------------------
+# 3️⃣ Create tables
+# -----------------------------
 Base.metadata.create_all(engine)
 
-# -------------------------------------------------------------------
-# 4️⃣ Flask App
-# -------------------------------------------------------------------
+# -----------------------------
+# 4️⃣ Flask app
+# -----------------------------
 app = Flask(__name__)
 CORS(app)
 
-# -------------------------------------------------------------------
-# 5️⃣ API ROUTES
-# -------------------------------------------------------------------
-
-# Test endpoint
+# -----------------------------
+# 5️⃣ API Routes
+# -----------------------------
 @app.route("/", methods=["GET"])
 def home():
     return {"status": "Backend running with PostgreSQL 🎉"}
-
-
 
 @app.route("/db-test", methods=["GET"])
 def db_test():
@@ -78,84 +131,79 @@ def db_test():
     except Exception as e:
         return {"status": "Database Error", "message": str(e)}
 
-
 # Add block
 @app.route("/add_block", methods=["POST"])
 def add_block():
-    try:
-        data = request.json
-
-        new_block = Block(
-            block_hash=data["block_hash"],
-            previous_hash=data["previous_hash"],
-            nonce=data.get("nonce"),
-            data=data.get("data"),
-            block_metadata=data.get("metadata")  # DB column is "block_metadata"
-        )
-        session.add(new_block)
-        session.commit()
-
-        return jsonify({"message": "Block added successfully"}), 201
-
-    except SQLAlchemyError as e:
-        session.rollback()
-        return jsonify({"error": str(e)}), 500
-
+    data = request.json
+    with SessionLocal() as session:
+        try:
+            new_block = Block(
+                block_hash=data["block_hash"],
+                previous_hash=data.get("previous_hash"),
+                nonce=data.get("nonce"),
+                data=data.get("data"),
+                block_metadata=data.get("metadata")
+            )
+            session.add(new_block)
+            session.commit()
+            return jsonify({"message": "Block added successfully"}), 201
+        except SQLAlchemyError as e:
+            session.rollback()
+            return jsonify({"error": str(e)}), 500
 
 # Add transaction
 @app.route("/add_transaction", methods=["POST"])
 def add_transaction():
-    try:
-        data = request.json
+    data = request.json
+    with SessionLocal() as session:
+        try:
+            new_tx = Transaction(
+                block_id=data["block_id"],
+                sender=data["sender"],
+                receiver=data["receiver"],
+                amount=data["amount"],
+                tx_hash=data["tx_hash"]
+            )
+            session.add(new_tx)
+            session.commit()
+            return jsonify({"message": "Transaction added successfully"}), 201
+        except SQLAlchemyError as e:
+            session.rollback()
+            return jsonify({"error": str(e)}), 500
 
-        new_tx = Transaction(
-            block_id=data["block_id"],
-            sender=data["sender"],
-            receiver=data["receiver"],
-            amount=data["amount"],
-            tx_hash=data["tx_hash"]
-        )
+# Get blocks (frontend likely calls /blocks)
+@app.route("/blocks", methods=["GET"])
+def get_blocks_alias():
+    return get_blocks()
 
-        session.add(new_tx)
-        session.commit()
-
-        return jsonify({"message": "Transaction added successfully"}), 201
-
-    except SQLAlchemyError as e:
-        session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-
-# Get all blocks with transactions
 @app.route("/get_blocks", methods=["GET"])
 def get_blocks():
-    blocks = session.query(Block).all()
+    with SessionLocal() as session:
+        blocks = session.query(Block).all()
+        result = []
+        for block in blocks:
+            result.append({
+                "id": block.id,
+                "block_hash": block.block_hash,
+                "previous_hash": block.previous_hash,
+                "nonce": block.nonce,
+                "data": block.data,
+                "metadata": block.block_metadata,
+                "transactions": [
+                    {
+                        "id": tx.id,
+                        "sender": tx.sender,
+                        "receiver": tx.receiver,
+                        "amount": tx.amount,
+                        "tx_hash": tx.tx_hash
+                    }
+                    for tx in block.transactions
+                ]
+            })
+        return jsonify(result)
 
-    result = []
-    for block in blocks:
-        result.append({
-            "id": block.id,
-            "block_hash": block.block_hash,
-            "previous_hash": block.previous_hash,
-            "nonce": block.nonce,
-            "data": block.data,
-            "metadata": block.block_metadata,  # send original field name
-            "transactions": [
-                {
-                    "id": tx.id,
-                    "sender": tx.sender,
-                    "receiver": tx.receiver,
-                    "amount": tx.amount,
-                    "tx_hash": tx.tx_hash
-                }
-                for tx in block.transactions
-            ]
-        })
-
-    return jsonify(result)
-
-# -------------------------------------------------------------------
-# 6️⃣ Run app
-# -------------------------------------------------------------------
+# -----------------------------
+# 6️⃣ Run
+# -----------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
