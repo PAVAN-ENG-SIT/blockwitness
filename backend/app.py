@@ -1,82 +1,38 @@
 # backend/app.py
 
 import os
-from flask import Flask, request, jsonify,send_file
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, text
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
+from fpdf import FPDF
 from chain_utils import sha256_bytes, merkle_root
 from crypto_utils import sign_hex, verify_hex
 
-
-@app.route("/generate_certificate", methods=["POST"])
-def generate_certificate():
-    data = request.json
-    student_name = data.get("student_name")
-    course = data.get("course")
-    date = data.get("date")
-
-    if not all([student_name, course, date]):
-        return {"error": "Missing data"}, 400
-
-    # -----------------
-    # 1️⃣ Create PDF certificate
-    # -----------------
-    cert_content = f"Certificate of Completion\n\nStudent: {student_name}\nCourse: {course}\nDate: {date}"
-    
-    os.makedirs("certificates", exist_ok=True)
-    cert_file_path = os.path.join("certificates", f"{student_name}_certificate.pdf")
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=16)
-    pdf.multi_cell(0, 10, cert_content)
-    pdf.output(cert_file_path)
-
-    # -----------------
-    # 2️⃣ Compute hash of PDF
-    # -----------------
-    with open(cert_file_path, "rb") as f:
-        pdf_bytes = f.read()
-    cert_hash = sha256_bytes(pdf_bytes)
-
-    # -----------------
-    # 3️⃣ Sign the certificate hash
-    # -----------------
-    priv_key_path = os.path.join("keys", "issuer_priv.pem")  # Make sure your keys are here
-    signature_hex = sign_hex(priv_key_path, cert_hash)
-
-    # -----------------
-    # 4️⃣ Return PDF path, hash, and signature
-    # -----------------
-    return jsonify({
-        "certificate_file": cert_file_path,  # Frontend can use send_file
-        "hash": cert_hash,
-        "signature": signature_hex
-    })
-# Instead of returning path
-return send_file(cert_file_path, as_attachment=True)
+# -----------------------------
+# 1️⃣ Flask app setup
+# -----------------------------
+app = Flask(__name__)
+CORS(app)
 
 # -----------------------------
-# 1️⃣ PostgreSQL connection
+# 2️⃣ PostgreSQL connection
 # -----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 if not DATABASE_URL:
     raise Exception("DATABASE_URL environment variable not set")
 
-# Fix for Render
+# Render fix: replace old postgres URI scheme
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
 engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
 SessionLocal = sessionmaker(bind=engine)
-
 Base = declarative_base()
 
 # -----------------------------
-# 2️⃣ Models
+# 3️⃣ Models
 # -----------------------------
 class Block(Base):
     __tablename__ = "blocks"
@@ -105,18 +61,12 @@ class Transaction(Base):
 
 
 # -----------------------------
-# 3️⃣ Create tables
+# 4️⃣ Create tables if not exist
 # -----------------------------
 Base.metadata.create_all(engine)
 
 # -----------------------------
-# 4️⃣ Flask app
-# -----------------------------
-app = Flask(__name__)
-CORS(app)
-
-# -----------------------------
-# 5️⃣ API Routes
+# 5️⃣ Routes
 # -----------------------------
 @app.route("/", methods=["GET"])
 def home():
@@ -124,6 +74,7 @@ def home():
 
 @app.route("/db-test", methods=["GET"])
 def db_test():
+    """Simple test to confirm database connection"""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -131,7 +82,45 @@ def db_test():
     except Exception as e:
         return {"status": "Database Error", "message": str(e)}
 
+# -----------------------------
+# Generate certificate
+# -----------------------------
+@app.route("/generate_certificate", methods=["POST"])
+def generate_certificate():
+    data = request.json
+    student_name = data.get("student_name")
+    course = data.get("course")
+    date = data.get("date")
+
+    if not all([student_name, course, date]):
+        return {"error": "Missing data"}, 400
+
+    # Create PDF certificate
+    os.makedirs("certificates", exist_ok=True)
+    cert_file_path = os.path.join("certificates", f"{student_name}_certificate.pdf")
+    cert_content = f"Certificate of Completion\n\nStudent: {student_name}\nCourse: {course}\nDate: {date}"
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=16)
+    pdf.multi_cell(0, 10, cert_content)
+    pdf.output(cert_file_path)
+
+    # Hash PDF
+    with open(cert_file_path, "rb") as f:
+        pdf_bytes = f.read()
+    cert_hash = sha256_bytes(pdf_bytes)
+
+    # Sign hash
+    priv_key_path = os.path.join("keys", "issuer_priv.pem")
+    signature_hex = sign_hex(priv_key_path, cert_hash)
+
+    # Return PDF, hash, signature
+    return send_file(cert_file_path, as_attachment=True), 200
+
+# -----------------------------
 # Add block
+# -----------------------------
 @app.route("/add_block", methods=["POST"])
 def add_block():
     data = request.json
@@ -151,7 +140,9 @@ def add_block():
             session.rollback()
             return jsonify({"error": str(e)}), 500
 
+# -----------------------------
 # Add transaction
+# -----------------------------
 @app.route("/add_transaction", methods=["POST"])
 def add_transaction():
     data = request.json
@@ -171,7 +162,9 @@ def add_transaction():
             session.rollback()
             return jsonify({"error": str(e)}), 500
 
-# Get blocks (frontend likely calls /blocks)
+# -----------------------------
+# Get blocks
+# -----------------------------
 @app.route("/blocks", methods=["GET"])
 def get_blocks_alias():
     return get_blocks()
@@ -196,14 +189,14 @@ def get_blocks():
                         "receiver": tx.receiver,
                         "amount": tx.amount,
                         "tx_hash": tx.tx_hash
-                    }
-                    for tx in block.transactions
+                    } for tx in block.transactions
                 ]
             })
         return jsonify(result)
 
 # -----------------------------
-# 6️⃣ Run
+# 6️⃣ Run the app
 # -----------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    port = int(os.getenv("PORT", 5000))  # Render requires using PORT env variable
+    app.run(host="0.0.0.0", port=port)
