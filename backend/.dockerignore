@@ -1,0 +1,39 @@
+# Python
+backend/__pycache__
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.Python
+backend/venv
+backend/env
+backend/.venv
+
+# Database (will be created fresh on Render)
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+
+# Uploads (will be created fresh)
+backend/uploads/*
+backend/certificates/*
+
+# Frontend
+frontend/
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+read.md
+*.md
+
+# Other
+.DS_Store
+Thumbs.db
+*.log
+.env.local
+start.sh
+main.py
