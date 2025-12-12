@@ -1,13 +1,14 @@
 // frontend/src/api.js
-const API_BASE = "https://blockwi.onrender.com/api";
 
-// to connect the backend with frontend you should paste the url of your backend here first
-//successfullyworking
+// Use environment variable for API base URL, fallback to local development
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+
+console.log("🔗 API Base URL:", API_BASE);
 
 async function fetchJson(url, opts = {}) {
   const res = await fetch(url, opts);
   if (!res.ok) {
-    const txt = await res.text().catch(()=>"(no body)");
+    const txt = await res.text().catch(() => "(no body)");
     throw new Error(`Request failed ${res.status} ${res.statusText} -> ${txt}`);
   }
   return res;
@@ -17,7 +18,10 @@ async function fetchJson(url, opts = {}) {
 // REPORTS
 // -----------------
 export async function createReport(formData) {
-  const res = await fetchJson(`${API_BASE}/report`, { method: "POST", body: formData });
+  const res = await fetchJson(`${API_BASE}/report`, { 
+    method: "POST", 
+    body: formData 
+  });
   return res.json();
 }
 
@@ -58,7 +62,10 @@ export async function getMerkleProof(blockIdx, leaf) {
 }
 
 export async function verifyFile(formData) {
-  const res = await fetchJson(`${API_BASE}/verify`, { method: "POST", body: formData });
+  const res = await fetchJson(`${API_BASE}/verify`, { 
+    method: "POST", 
+    body: formData 
+  });
   return res.json();
 }
 
