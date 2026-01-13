@@ -147,6 +147,7 @@ def create_block(transactions_data, previous_hash):
 def home():
     return {"status": "BlockWitness Backend Running 🎉"}
 
+@app.route("/report", methods=["POST"])
 @app.route("/api/report", methods=["POST"])
 def create_report():
     """Create a new incident report with evidence files"""
@@ -260,6 +261,7 @@ def get_block(idx):
             "transactions": transactions
         })
 
+@app.route("/verify", methods=["POST"])
 @app.route("/api/verify", methods=["POST"])
 def verify_file():
     """Verify if a file exists in the blockchain"""
@@ -301,6 +303,7 @@ def verify_file():
         print(f"Error verifying file: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/search", methods=["GET"])
 @app.route("/api/search", methods=["GET"])
 def search():
     """Search reports by keyword"""
@@ -332,6 +335,8 @@ def search():
         
         return jsonify(results)
 
+@app.route("/timeline", methods=["GET"])
+@app.route("/chain/timeline", methods=["GET"])
 @app.route("/api/chain/timeline", methods=["GET"])
 def timeline():
     """Get chronological timeline of all blocks"""
@@ -358,6 +363,7 @@ def timeline():
         
         return jsonify(result)
 
+@app.route("/chain/verify", methods=["GET"])
 @app.route("/api/chain/verify", methods=["GET"])
 def verify_chain():
     """Verify the integrity of the entire blockchain"""
