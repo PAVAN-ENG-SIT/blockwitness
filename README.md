@@ -118,6 +118,35 @@ blockwitness/
 7. **Certificate Generation**
 
    * Downloadable PDF with QR code for validation
+## 🖼️ Application Screenshots
+
+### 📜 Blockchain Certificate
+<img src="images/blockchain-certificate.png" width="850" />
+
+---
+
+### ➕ Create Section
+<img src="images/create-section.png" width="850" />
+
+---
+
+### 🔍 Explorer Section
+<img src="images/explorer-section.png" width="850" />
+
+---
+
+### 🔎 Search Section
+<img src="images/search-section.png" width="850" />
+
+---
+
+### ⏱️ Timeline Section
+<img src="images/timeline-section.png" width="850" />
+
+---
+
+### ✅ Verify Section
+<img src="images/verify-section.png" width="850" />
 
 ---
 
