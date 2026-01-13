@@ -8,5 +8,6 @@ qrcode==7.4.2
 Pillow
 gunicorn==21.2.0
 waitress
+python-dotenv==1.0.1
 
 
