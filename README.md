@@ -119,6 +119,42 @@ blockwitness/
 
    * Downloadable PDF with QR code for validation
 
+## 🖼️ Application Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <b>Create</b><br/>
+      <img src="images/create-section.png" width="450"/>
+    </td>
+    <td align="center">
+      <b>Explorer</b><br/>
+      <img src="images/explorer-section.png" width="450"/>
+    </td>
+    
+  </tr>
+  <tr>
+    <td align="center">
+      <b>Search</b><br/>
+      <img src="images/search-section.png" width="450"/>
+    </td>
+    <td align="center">
+      <b>Timeline</b><br/>
+      <img src="images/timeline-section.png" width="450"/>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>Verify</b><br/>
+      <img src="images/verify-section.png" width="450"/>
+    </td>
+    <td align="center">
+      <b>Certificate</b><br/>
+      <img src="images/blockchain-certificate.png" width="450"/>
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## 📋 Prerequisites
@@ -185,12 +221,11 @@ Backend will run at:
 ### 4️⃣ Frontend Setup
 
 Open a new terminal:
-
-
+```
 cd frontend
 npm install
 npm run dev
-
+```
 
 Frontend will run at:
 👉 **[http://localhost:5000](http://localhost:5000)**
