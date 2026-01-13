@@ -221,12 +221,11 @@ Backend will run at:
 ### 4️⃣ Frontend Setup
 
 Open a new terminal:
-
-
+```
 cd frontend
 npm install
 npm run dev
-
+```
 
 Frontend will run at:
 👉 **[http://localhost:5000](http://localhost:5000)**
