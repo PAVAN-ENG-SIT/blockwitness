@@ -1,124 +1,213 @@
-# BlockWitness 🚀
+🔗 BlockWitness
 
-BlockWitness is a full-stack blockchain web application that allows users to upload files, generate verifiable reports, view blockchain proofs (like Merkle paths), and interactively verify integrity and authenticity.
+BlockWitness is a full-stack blockchain-inspired web application that enables tamper-proof file verification using cryptographic hashing, Merkle trees, and immutable block chaining.
 
-Built with a **Python Flask (Waitress)** backend connected to **Supabase (PostgreSQL)** and a **React + Vite** frontend.
+Users can upload files, generate verifiable blockchain records, explore blocks and proofs, and download PDF verification certificates with QR codes — all backed by Supabase (PostgreSQL).
 
-## 📌 Table of Contents
+📌 Table of Contents
 
-- [What is BlockWitness](#-what-is-blockwitness)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Prerequisites](#-prerequisites)
-- [Quick Start (Local Setup)](#-quick-start-local-setup)
-- [Environment Configuration](#-environment-configuration)
-- [Deployment](#-deployment)
-- [License](#-license)
+Overview
 
-## 🧠 What is BlockWitness?
+Key Features
 
-BlockWitness is a decentralized-style webapp that lets users:
-✅ Upload any file
-✅ Create a cryptographically anchored “report”
-✅ Store transactions securely in **Supabase**
-✅ Explore Merkle proofs & blockchain-style block chains
-✅ Verify file integrity through proofs
-✅ Download PDF reports with QR codes
+Tech Stack
 
-## 🛠️ Features
+Project Structure
 
-- **Supabase Integration**: Robust PostgreSQL database storage for blocks and transactions.
-- **Merkle Chain Explorer**: Browse created blocks and proofs visually.
-- **PDF Reports with QR**: Generate printable reports for offline verification.
-- **File Verification**: Validate any uploaded file against the blockchain ledger.
-- **Timeline View**: See sequencing of uploaded items.
-- **Windows Optimized**: Uses `waitress` to run stably on Windows environments.
+How It Works
 
-## 🧩 Tech Stack
+Prerequisites
 
-| Component | Technology |
-|-----------|------------|
-| **Backend** | Python 3.14+, Flask, Waitress (Server), SQLAlchemy |
-| **Database** | Supabase (PostgreSQL) |
-| **Frontend** | React, Vite |
-| **Utilities** | ReportLab (PDF), QRCode, Dotenv |
+Local Setup
 
-## 📋 Prerequisites
+Environment Variables
 
-Before running the project, ensure you have the following installed:
+Running the Application
 
-1.  **Python 3.10+** (tested on 3.14)
-2.  **Node.js & npm** (LTS version recommended)
-3.  **Supabase Account**: You need a project URL and Database Password.
+Deployment
 
-## 🚀 Quick Start (Local Setup)
+License
 
-### 1. Clone the Repository
-```bash
+🧠 Overview
+
+BlockWitness demonstrates how blockchain concepts can be applied to file integrity, authenticity, and verification without requiring a public blockchain network.
+
+Each uploaded file is:
+
+Cryptographically hashed
+
+Stored as a transaction
+
+Grouped into blocks
+
+Anchored with a Merkle root
+
+Persisted in PostgreSQL
+
+Verifiable at any time
+
+✨ Key Features
+
+🔐 Cryptographic Hashing (SHA-based)
+
+🌳 Merkle Tree Proofs
+
+🧱 Blockchain-Style Block Chaining
+
+🗄️ Supabase PostgreSQL Storage
+
+📄 PDF Certificates with QR Codes
+
+🔍 Block & Transaction Explorer
+
+⏳ Timeline View
+
+🪟 Windows-Optimized Backend (Waitress)
+
+🧩 Tech Stack
+Layer	Technology
+Backend	Python, Flask, Waitress
+Database	Supabase (PostgreSQL)
+ORM	SQLAlchemy
+Frontend	React, Vite
+Styling	Tailwind CSS
+PDF & QR	ReportLab, qrcode
+Config	python-dotenv
+🏗️ Project Structure
+blockwitness/
+├── backend/
+│   ├── app.py               # Flask API & routes
+│   ├── chain_utils.py       # Blockchain & Merkle logic
+│   ├── crypto_utils.py      # Hashing & cryptography utilities
+│   ├── config.py            # Environment & DB configuration
+│   ├── run_waitress.py      # Windows-safe server runner
+│   ├── chain.db             # Local SQLite (dev/testing)
+│   ├── uploads/             # Uploaded files
+│   ├── certificates/        # Generated PDF certificates
+│   ├── keys/                # Cryptographic keys
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/                 # React source code
+│   ├── public/
+│   ├── index.html
+│   └── vite.config.js
+│
+├── .env                     # Environment variables
+├── render.yaml              # Render deployment config
+├── start.sh                 # Linux start script
+└── README.md
+
+🔄 How It Works
+
+File Upload
+
+User uploads a file from the frontend
+
+Hash Generation
+
+Backend computes a cryptographic hash
+
+Transaction Creation
+
+File metadata and hash stored as a transaction
+
+Block Formation
+
+Transactions grouped into blocks
+
+Merkle root calculated
+
+Database Storage
+
+Data persisted in Supabase PostgreSQL
+
+Verification
+
+File integrity verified using Merkle proofs
+
+Certificate Generation
+
+Downloadable PDF with QR code for validation
+
+📋 Prerequisites
+
+Before running the project, ensure you have:
+
+Python 3.10+ (tested up to 3.14)
+
+Node.js (LTS recommended)
+
+Supabase account
+
+Project ID
+
+Database password
+
+⚙️ Local Setup
+1️⃣ Clone the Repository
 git clone https://github.com/PAVAN-ENG-SIT/blockwitness.git
 cd blockwitness
-```
 
-### 2. Configure Environment (`.env`)
-Create a `.env` file in the **root directory** of the project (`blockwitness/.env`).
-Add your Supabase details (use port **6543** for IPv6/Connection Pooling support if needed):
+2️⃣ Environment Variables
 
-```env
-# Backend Configuration
+Create a .env file in the project root:
+
+# Backend
 USE_POSTGRES=true
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:6543/postgres?connect_timeout=10
+DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT_ID].supabase.co:6543/postgres
 PORT=8000
 
-# Frontend Configuration
+# Frontend
 VITE_API_URL=/api
-```
 
-### 3. Backend Setup (Python)
-Open a terminal in the `backend` folder:
 
-```bash
+📌 Use port 6543 for Supabase connection pooling.
+
+3️⃣ Backend Setup
 cd backend
-# Create virtual environment (optional but recommended)
+
 python -m venv venv
-# Activate venv:
+# Activate:
 # Windows: venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
+# macOS/Linux: source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the server (Windows optimized)
 python run_waitress.py
-```
-*You should see: `Backend running on http://0.0.0.0:8000`*
 
-### 4. Frontend Setup (React)
-Open a **new terminal** in the `frontend` folder:
 
-```bash
+Backend will run at:
+👉 http://localhost:8000
+
+4️⃣ Frontend Setup
+
+Open a new terminal:
+
 cd frontend
 npm install
 npm run dev
-```
-*You should see: `Local: http://localhost:5000`*
 
-👉 **Open your browser:** [http://localhost:5000](http://localhost:5000)
 
-## 📊 How It Works
+Frontend will run at:
+👉 http://localhost:5000
 
-1.  **Upload**: User uploads a file via the frontend.
-2.  **Process**: Backend hashes the file, creates a transaction, and enters it into the Database.
-3.  **Merkle Proof**: A Merkle root is calculated for the block.
-4.  **Verification**: Users can download a PDF validation certificate containing the proof and QR code.
+🚀 Deployment
 
-## 📦 Deployment
+BlockWitness can be deployed on platforms like Render, Railway, or Vercel (frontend).
 
-You can deploy on platforms like Render, Railway, or Vercel.
+Backend
+python run_waitress.py
+# or (Linux)
+gunicorn app:app
 
-1.  **Database**: Ensure your `DATABASE_URL` environment variable is set on the cloud provider.
-2.  **Backend**: Command to run: `python run_waitress.py` (or `gunicorn app:app` for Linux).
-3.  **Frontend**: Build command: `npm run build`, Publish directory: `dist`.
+Frontend
+npm run build
 
-## 📜 License
 
-This project is open source.
+Ensure DATABASE_URL and environment variables are set in the hosting platform.
+
+📜 License
+
+This project is open-source and available under the MIT License.
+
+⭐ If you like this project, consider starring the repository!
