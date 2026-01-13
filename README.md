@@ -1,79 +1,72 @@
-🔗 BlockWitness
+# 🔗 BlockWitness
 
-BlockWitness is a full-stack blockchain-inspired web application that enables tamper-proof file verification using cryptographic hashing, Merkle trees, and immutable block chaining.
+**BlockWitness** is a full-stack blockchain-inspired web application that enables **tamper-proof file verification** using cryptographic hashing, Merkle trees, and immutable block chaining.
 
-Users can upload files, generate verifiable blockchain records, explore blocks and proofs, and download PDF verification certificates with QR codes — all backed by Supabase (PostgreSQL).
+Users can upload files, generate verifiable blockchain records, explore blocks and proofs, and download **PDF verification certificates with QR codes** — all backed by **Supabase (PostgreSQL)**.
 
-📌 Table of Contents
+---
 
-Overview
+## 📌 Table of Contents
 
-Key Features
+* [Overview](#-overview)
+* [Key Features](#-key-features)
+* [Tech Stack](#-tech-stack)
+* [Project Structure](#-project-structure)
+* [How It Works](#-how-it-works)
+* [Prerequisites](#-prerequisites)
+* [Local Setup](#-local-setup)
+* [Environment Variables](#-environment-variables)
+* [Running the Application](#-running-the-application)
+* [Deployment](#-deployment)
+* [License](#-license)
 
-Tech Stack
+---
 
-Project Structure
+## 🧠 Overview
 
-How It Works
-
-Prerequisites
-
-Local Setup
-
-Environment Variables
-
-Running the Application
-
-Deployment
-
-License
-
-🧠 Overview
-
-BlockWitness demonstrates how blockchain concepts can be applied to file integrity, authenticity, and verification without requiring a public blockchain network.
+BlockWitness demonstrates how blockchain concepts can be applied to **file integrity, authenticity, and verification** without requiring a public blockchain network.
 
 Each uploaded file is:
 
-Cryptographically hashed
+* Cryptographically hashed
+* Stored as a transaction
+* Grouped into blocks
+* Anchored with a Merkle root
+* Persisted in PostgreSQL
+* Verifiable at any time
 
-Stored as a transaction
+---
 
-Grouped into blocks
+## ✨ Key Features
 
-Anchored with a Merkle root
+* 🔐 **Cryptographic Hashing** (SHA-based)
+* 🌳 **Merkle Tree Proofs**
+* 🧱 **Blockchain-Style Block Chaining**
+* 🗄️ **Supabase PostgreSQL Storage**
+* 📄 **PDF Certificates with QR Codes**
+* 🔍 **Block & Transaction Explorer**
+* ⏳ **Timeline View**
+* 🪟 **Windows-Optimized Backend (Waitress)**
 
-Persisted in PostgreSQL
+---
 
-Verifiable at any time
+## 🧩 Tech Stack
 
-✨ Key Features
+| Layer    | Technology              |
+| -------- | ----------------------- |
+| Backend  | Python, Flask, Waitress |
+| Database | Supabase (PostgreSQL)   |
+| ORM      | SQLAlchemy              |
+| Frontend | React, Vite             |
+| Styling  | Tailwind CSS            |
+| PDF & QR | ReportLab, qrcode       |
+| Config   | python-dotenv           |
 
-🔐 Cryptographic Hashing (SHA-based)
+---
 
-🌳 Merkle Tree Proofs
+## 🏗️ Project Structure
 
-🧱 Blockchain-Style Block Chaining
-
-🗄️ Supabase PostgreSQL Storage
-
-📄 PDF Certificates with QR Codes
-
-🔍 Block & Transaction Explorer
-
-⏳ Timeline View
-
-🪟 Windows-Optimized Backend (Waitress)
-
-🧩 Tech Stack
-Layer	Technology
-Backend	Python, Flask, Waitress
-Database	Supabase (PostgreSQL)
-ORM	SQLAlchemy
-Frontend	React, Vite
-Styling	Tailwind CSS
-PDF & QR	ReportLab, qrcode
-Config	python-dotenv
-🏗️ Project Structure
+```
 blockwitness/
 ├── backend/
 │   ├── app.py               # Flask API & routes
@@ -97,62 +90,66 @@ blockwitness/
 ├── render.yaml              # Render deployment config
 ├── start.sh                 # Linux start script
 └── README.md
+```
 
-🔄 How It Works
+---
 
-File Upload
+## 🔄 How It Works
 
-User uploads a file from the frontend
+1. **File Upload**
 
-Hash Generation
+   * User uploads a file from the frontend
+2. **Hash Generation**
 
-Backend computes a cryptographic hash
+   * Backend computes a cryptographic hash
+3. **Transaction Creation**
 
-Transaction Creation
+   * File metadata and hash stored as a transaction
+4. **Block Formation**
 
-File metadata and hash stored as a transaction
+   * Transactions grouped into blocks
+   * Merkle root calculated
+5. **Database Storage**
 
-Block Formation
+   * Data persisted in Supabase PostgreSQL
+6. **Verification**
 
-Transactions grouped into blocks
+   * File integrity verified using Merkle proofs
+7. **Certificate Generation**
 
-Merkle root calculated
+   * Downloadable PDF with QR code for validation
 
-Database Storage
+---
 
-Data persisted in Supabase PostgreSQL
-
-Verification
-
-File integrity verified using Merkle proofs
-
-Certificate Generation
-
-Downloadable PDF with QR code for validation
-
-📋 Prerequisites
+## 📋 Prerequisites
 
 Before running the project, ensure you have:
 
-Python 3.10+ (tested up to 3.14)
+* **Python 3.10+** (tested up to 3.14)
+* **Node.js (LTS recommended)**
+* **Supabase account**
 
-Node.js (LTS recommended)
+  * Project ID
+  * Database password
 
-Supabase account
+---
 
-Project ID
+## ⚙️ Local Setup
 
-Database password
+### 1️⃣ Clone the Repository
 
-⚙️ Local Setup
-1️⃣ Clone the Repository
+```
 git clone https://github.com/PAVAN-ENG-SIT/blockwitness.git
 cd blockwitness
+```
 
-2️⃣ Environment Variables
+---
 
-Create a .env file in the project root:
+### 2️⃣ Environment Variables
 
+Create a `.env` file in the project root:
+
+```env
 # Backend
 USE_POSTGRES=true
 DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT_ID].supabase.co:6543/postgres
@@ -160,11 +157,15 @@ PORT=8000
 
 # Frontend
 VITE_API_URL=/api
+```
 
+📌 Use **port 6543** for Supabase connection pooling.
 
-📌 Use port 6543 for Supabase connection pooling.
+---
 
-3️⃣ Backend Setup
+### 3️⃣ Backend Setup
+
+```
 cd backend
 
 python -m venv venv
@@ -174,14 +175,17 @@ python -m venv venv
 
 pip install -r requirements.txt
 python run_waitress.py
-
+```
 
 Backend will run at:
-👉 http://localhost:8000
+👉 **[http://localhost:8000](http://localhost:8000)**
 
-4️⃣ Frontend Setup
+
+
+### 4️⃣ Frontend Setup
 
 Open a new terminal:
+
 
 cd frontend
 npm install
@@ -189,25 +193,36 @@ npm run dev
 
 
 Frontend will run at:
-👉 http://localhost:5000
+👉 **[http://localhost:5000](http://localhost:5000)**
 
-🚀 Deployment
 
-BlockWitness can be deployed on platforms like Render, Railway, or Vercel (frontend).
 
-Backend
+## 🚀 Deployment
+
+BlockWitness can be deployed on platforms like **Render**, **Railway**, or **Vercel (frontend)**.
+
+### Backend
+
+
 python run_waitress.py
 # or (Linux)
 gunicorn app:app
 
-Frontend
+
+### Frontend
+
+
 npm run build
 
 
-Ensure DATABASE_URL and environment variables are set in the hosting platform.
+Ensure `DATABASE_URL` and environment variables are set in the hosting platform.
 
-📜 License
 
-This project is open-source and available under the MIT License.
 
-⭐ If you like this project, consider starring the repository!
+## 📜 License
+
+This project is **open-source** and available under the **MIT License**.
+
+
+### ⭐ If you like this project, consider starring the repository!
+
