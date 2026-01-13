@@ -1,0 +1,29 @@
+services:
+  # Backend API Service
+  - type: web
+    name: blockwitness-backend
+    env: python
+    region: oregon
+    plan: free
+    # Specify root directory if backend is in subfolder
+    rootDir: backend
+    # Build command
+    buildCommand: pip install -r requirements.txt
+    # Start command
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_URL
+        fromDatabase:
+          name: blockwitness-db
+          property: connectionString
+    healthCheckPath: /
+
+databases:
+  # PostgreSQL Database
+  - name: blockwitness-db
+    databaseName: blockwitness
+    user: blockwitness
+    region: oregon
+    plan: free

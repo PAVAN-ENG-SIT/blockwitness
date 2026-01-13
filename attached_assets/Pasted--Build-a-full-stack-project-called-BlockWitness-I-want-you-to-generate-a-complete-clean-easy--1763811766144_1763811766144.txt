@@ -1,0 +1,187 @@
+📌 Build a full-stack project called “BlockWitness”
+
+I want you to generate a complete, clean, easy-to-understand implementation of a tamper-proof digital evidence recorder called BlockWitness.
+
+Use Node.js + Express + SQLite for backend and HTML + CSS + JS (no React) for frontend so it stays inside Replit limits.
+
+🎯 Functional Requirements
+1. Evidence Upload + Report System
+
+Upload files (image/video/docs)
+
+Compute SHA-256 hash of each file
+
+Store file + hash + metadata locally
+
+Generate report ID and block ID
+
+2. Blockchain Simulation
+
+Implement a simple blockchain with:
+
+index
+
+previous_hash
+
+merkle_root
+
+timestamp
+
+transactions (list of evidence items)
+
+block_hash (SHA-256 of block payload)
+
+RSA/ECDSA signature of block_hash
+
+Store all of this in SQLite.
+
+3. Merkle Tree
+
+Build Merkle tree from file hashes
+
+Store merkle_root inside block
+
+Provide helper to verify file → merkle proof
+
+4. Verification Page
+
+User uploads a file →
+Compute SHA-256 → compare with stored hashes →
+If match → show:
+
+matched block index
+
+block hash
+
+merkle root
+
+signature valid / invalid
+
+If mismatch → show File Modified ❌.
+
+5. User Interface
+
+Build 3 pages:
+
+/ → Create Report
+
+/explorer → Block explorer list
+
+/verify → Verify file authenticity
+
+All pages must use:
+
+colors: red, royal blue, green, black, white + bright gradients
+
+best animations: smooth fade-in, slide-up, hover glow, button pulse
+
+smooth transitions
+
+clean modern cards and buttons
+
+Make UI:
+
+very interactive
+
+minimal
+
+mobile responsive
+
+NO React, only pure HTML/CSS/JS.
+
+6. Animations Required
+
+card hover lift
+
+gradient background animation
+
+glowing buttons
+
+file-preview fade-in
+
+block explorer smooth accordion expand
+
+7. Output Requirements
+
+Create clean folder structure:
+
+/public
+   |– style.css
+   |– script.js
+/server
+   |– blockchain.js
+   |– merkle.js
+   |– db.js
+   |– signer.js
+   |– routes.js
+index.js
+
+
+Write extremely clean code with comments
+
+Keep logic simple and readable
+
+Everything must run directly on Replit without extra configuration
+
+8. Technical Logic Summary (for Replit agent clarity)
+
+Follow EXACTLY this sequence:
+
+When report is created:
+
+Save uploaded files to /uploads
+
+For each file:
+
+read bytes
+
+compute SHA-256
+
+Build Merkle tree → merkle_root
+
+Create block payload:
+
+{
+  index,
+  prev_hash,
+  merkle_root,
+  timestamp,
+  transactions
+}
+
+
+Compute block_hash = SHA256(payload)
+
+Sign with RSA/ECDSA private key
+
+Insert into SQLite:
+
+block info
+
+transactions
+
+signature
+
+For Verification:
+
+Upload file
+
+Compute SHA-256
+
+Search evidence table
+
+If found → display block + signature verification
+
+If not found → show “Modified ❌”
+
+9. Deliverables
+
+Fully working backend
+
+Fully designed colorful UI
+
+All animations included
+
+Clean code comments
+
+Instructions at bottom of output: “Run with: node index.js”
