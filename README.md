@@ -118,7 +118,6 @@ blockwitness/
 7. **Certificate Generation**
 
    * Downloadable PDF with QR code for validation
-## 🖼️ Application Screenshots
 
 ## 🖼️ Application Screenshots
 
@@ -126,29 +125,32 @@ blockwitness/
   <tr>
     <td align="center">
       <b>Create</b><br/>
-      <img src="images/create-section.png" width="300"/>
+      <img src="images/create-section.png" width="450"/>
     </td>
     <td align="center">
       <b>Explorer</b><br/>
-      <img src="images/explorer-section.png" width="300"/>
+      <img src="images/explorer-section.png" width="450"/>
     </td>
+    
+  </tr>
+  <tr>
     <td align="center">
       <b>Search</b><br/>
-      <img src="images/search-section.png" width="300"/>
+      <img src="images/search-section.png" width="450"/>
+    </td>
+    <td align="center">
+      <b>Timeline</b><br/>
+      <img src="images/timeline-section.png" width="450"/>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <b>Timeline</b><br/>
-      <img src="images/timeline-section.png" width="300"/>
-    </td>
-    <td align="center">
       <b>Verify</b><br/>
-      <img src="images/verify-section.png" width="300"/>
+      <img src="images/verify-section.png" width="450"/>
     </td>
     <td align="center">
       <b>Certificate</b><br/>
-      <img src="images/blockchain-certificate.png" width="300"/>
+      <img src="images/blockchain-certificate.png" width="450"/>
     </td>
   </tr>
 </table>
