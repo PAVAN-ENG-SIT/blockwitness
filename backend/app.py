@@ -89,7 +89,7 @@ def create_block(transactions_data, previous_hash):
         metadata = json.loads(tx_data['tx_metadata'])
         all_hashes.extend([f['hash'] for f in metadata['files']])
     
-    merkle = merkle_root(all_hashes) if all_hashes else sha256_bytes(b"genesis").hex()
+    merkle = merkle_root(all_hashes) if all_hashes else sha256_bytes(b"genesis")
     
     # Create block data
     latest_block = get_latest_block()
@@ -98,7 +98,7 @@ def create_block(transactions_data, previous_hash):
     
     # Compute block hash
     block_data = f"{idx}{timestamp}{previous_hash}{merkle}"
-    block_hash = sha256_bytes(block_data.encode()).hex()
+    block_hash = sha256_bytes(block_data.encode())
     
     # Save block
     with SessionLocal() as session:
@@ -122,7 +122,7 @@ def create_block(transactions_data, previous_hash):
                 title=tx_data['title'],
                 uploader=tx_data['uploader'],
                 description=tx_data['description'],
-                tx_metadata=tx_data['metadata']
+                tx_metadata=tx_data['tx_metadata']
             )
             session.add(new_tx)
         
@@ -387,36 +387,76 @@ def download_certificate(report_id):
             
             block = session.query(Block).filter(Block.id == tx.block_id).first()
             
-            # Generate PDF
-            pdf = FPDF()
+            # Generate PDF (Landscape A4)
+            pdf = FPDF(orientation='L', unit='mm', format='A4')
             pdf.add_page()
             
+            # Background (Light Gray)
+            pdf.set_fill_color(245, 245, 245)
+            pdf.rect(0, 0, 297, 210, 'F')
+            
+            # Border (Thick Black)
+            pdf.set_line_width(2)
+            pdf.set_draw_color(0, 0, 0)
+            pdf.rect(10, 10, 277, 190)
+            
             # Title
-            pdf.set_font("Arial", "B", 24)
-            pdf.cell(0, 20, "CERTIFICATE OF AUTHENTICITY", align="C", ln=True)
+            pdf.set_y(40)
+            pdf.set_font("Arial", "B", 28)
+            pdf.cell(0, 10, "BLOCKCHAIN VERIFICATION CERTIFICATE", align="C", ln=True)
             
             # Report details
-            pdf.set_font("Arial", "", 12)
+            pdf.set_font("Arial", "", 16)
+            pdf.ln(20)
+            pdf.cell(0, 10, f"Report: {tx.title}", align="C", ln=True)
+            
             pdf.ln(10)
-            pdf.cell(0, 10, f"Report ID: {tx.report_id}", ln=True)
-            pdf.cell(0, 10, f"Title: {tx.title}", ln=True)
-            pdf.cell(0, 10, f"Submitted by: {tx.uploader}", ln=True)
-            pdf.cell(0, 10, f"Block: #{block.idx}", ln=True)
-            pdf.cell(0, 10, f"Timestamp: {block.timestamp}", ln=True)
-            pdf.ln(5)
-            pdf.multi_cell(0, 10, f"Block Hash: {block.block_hash}")
-            pdf.multi_cell(0, 10, f"Merkle Root: {block.merkle_root}")
+            pdf.cell(0, 10, f"Block Index: {block.idx}", align="C", ln=True)
             
-            # Generate QR code
-            qr = qrcode.QRCode(version=1, box_size=10, border=4)
-            qr.add_data(f"Report: {report_id}\nBlock: {block.idx}\nHash: {block.block_hash}")
+            # Hash (Monospace)
+            pdf.ln(15)
+            pdf.set_font("Courier", "", 12)
+            pdf.cell(0, 10, f"Hash: {block.block_hash}", align="C", ln=True)
+            
+            # Timestamp
+            ts_str = block.timestamp.replace('T', ' ').split('.')[0] if block.timestamp else "N/A"
+            pdf.ln(20)
+            pdf.set_font("Arial", "", 14)
+            pdf.cell(0, 10, f"Created: {ts_str}", align="C", ln=True)
+            
+            # --- 1️⃣ Unique QR Payload ---
+            qr_payload = {
+                "type": "Blockchain Certificate",
+                "report_id": report_id,
+                "block_index": block.idx,
+                "hash": block.block_hash,
+                "issued_at": datetime.utcnow().isoformat()
+            }
+            qr_text = json.dumps(qr_payload)
+            
+            # --- 2️⃣ Generate QR ---
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(qr_text)
             qr.make(fit=True)
-            qr_img = qr.make_image(fill_color="black", back_color="white")
             
-            qr_path = os.path.join(Config.CERTIFICATES_FOLDER, f"qr_{report_id}.png")
+            # IMPORTANT: Convert to RGB to avoid FPDF artifacts/noise
+            qr_img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+            
+            # --- 3️⃣ Unique Filename ---
+            # Use block hash prefix to ensure uniqueness and validity
+            qr_filename = f"qr_{block.block_hash[:12]}_{uuid.uuid4().hex[:8]}.png"
+            qr_path = os.path.join(Config.CERTIFICATES_FOLDER, qr_filename)
             qr_img.save(qr_path)
             
-            pdf.image(qr_path, x=80, y=150, w=50)
+            # --- 4️⃣ Embed QR into PDF ---
+            # A4 Landscape width = 297mm.
+            # Grid: x=235 starts near right margin.
+            pdf.image(qr_path, x=235, y=145, w=45, h=45)
             
             # Save PDF
             pdf_path = os.path.join(Config.CERTIFICATES_FOLDER, f"cert_{report_id}.pdf")
