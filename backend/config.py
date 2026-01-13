@@ -30,9 +30,16 @@ class Config:
         """Get the appropriate database URI"""
         if cls.USE_POSTGRES and cls.DATABASE_URL:
             # Render fix: replace old postgres URI scheme
-            if cls.DATABASE_URL.startswith("postgres://"):
-                return cls.DATABASE_URL.replace("postgres://", "postgresql://")
-            return cls.DATABASE_URL
+            url = cls.DATABASE_URL
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            
+            # Render requires SSL
+            if "sslmode=" not in url:
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}sslmode=require"
+                
+            return url
         else:
             # Use SQLite for local development
             return f"sqlite:///{cls.SQLITE_PATH}"

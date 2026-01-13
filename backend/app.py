@@ -29,7 +29,10 @@ print(f"🗄️  Using database: {DATABASE_URI}")
 
 engine = create_engine(
     DATABASE_URI,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URI else {"sslmode": "require"}
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=0
 )
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -69,9 +72,12 @@ class Transaction(Base):
 def init_db():
     """Initialize database and generate keys"""
     print("Initializing database...")
-    Base.metadata.create_all(engine)
-    generate_keys_if_missing()
-    print("Database initialized!")
+    try:
+        Base.metadata.create_all(engine)
+        generate_keys_if_missing()
+        print("✅ Database initialized!")
+    except Exception as e:
+        print(f"⚠️ Database init skipped or failed: {e}")
 
 # -----------------------------
 # 5️⃣ Helper functions
