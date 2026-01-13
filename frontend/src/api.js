@@ -6,9 +6,12 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 console.log("🔗 API Base URL:", API_BASE);
 
 async function fetchJson(url, opts = {}) {
+  console.log(`📡 Fetching: ${url}`);
   const res = await fetch(url, opts);
+  console.log(`⬅️ Status: ${res.status} for ${url}`);
   if (!res.ok) {
     const txt = await res.text().catch(() => "(no body)");
+    console.error(`❌ API Error: ${res.status} ${txt}`);
     throw new Error(`Request failed ${res.status} ${res.statusText} -> ${txt}`);
   }
   return res;

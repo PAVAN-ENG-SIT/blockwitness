@@ -214,6 +214,8 @@ def create_report():
         print(f"Error creating report: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/blocks", methods=["GET"])
+@app.route("/api/explorer", methods=["GET"])
 @app.route("/api/blocks", methods=["GET"])
 def explorer():
     """Get all blocks in the blockchain"""
