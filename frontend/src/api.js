@@ -41,7 +41,7 @@ export async function downloadCertificate(reportId) {
 // BLOCKCHAIN DATA
 // -----------------
 export async function explorer() {
-  const res = await fetchJson(`${API_BASE}/explorer`);
+  const res = await fetchJson(`${API_BASE}/blocks`);
   return res.json();
 }
 
