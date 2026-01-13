@@ -29,7 +29,7 @@ print(f"🗄️  Using database: {DATABASE_URI}")
 
 engine = create_engine(
     DATABASE_URI,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URI else {}
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URI else {"sslmode": "require"}
 )
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
