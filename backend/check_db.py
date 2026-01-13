@@ -1,14 +1,15 @@
-import sqlite3
+from app import SessionLocal, Transaction, Block
 
-conn = sqlite3.connect("chain.db")
-c = conn.cursor()
+session = SessionLocal()
 
 print("\n--- TRANSACTIONS TABLE ---")
-for row in c.execute("SELECT tx_id, report_id, title, uploader, metadata, block_idx FROM transactions"):
-    print(row)
+transactions = session.query(Transaction).all()
+for tx in transactions:
+    print(f"TxID: {tx.tx_id} | ReportID: {tx.report_id} | Title: {tx.title}")
 
 print("\n--- BLOCKS TABLE ---")
-for row in c.execute("SELECT idx, timestamp, previous_hash, merkle_root, block_hash FROM blocks"):
-    print(row)
+blocks = session.query(Block).all()
+for block in blocks:
+    print(f"Block #{block.idx} | Hash: {block.block_hash[:16]}... | Merkle: {block.merkle_root[:16]}...")
 
-conn.close()
+session.close()

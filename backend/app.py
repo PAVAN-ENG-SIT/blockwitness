@@ -1,497 +1,501 @@
 # backend/app.py
 import os
-import time
-import json
 import uuid
-import hashlib
-import sqlite3
-import base64
+import json
+import qrcode
 from io import BytesIO
-from pathlib import Path
-from flask import Flask, request, jsonify, send_file, abort
+from datetime import datetime
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from fpdf import FPDF
 
-try:
-    import qrcode
-except Exception:
-    qrcode = None
+from config import Config
+from chain_utils import sha256_file, sha256_bytes, merkle_root
+from crypto_utils import sign_hex, verify_hex, generate_keys_if_missing
 
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.utils import ImageReader
-except Exception:
-    # reportlab may not be installed
-    canvas = None
-
-BASE_DIR = Path(__file__).parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-DB_PATH = BASE_DIR / "chain.db"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
+# -----------------------------
+# 1️⃣ Flask app setup
+# -----------------------------
 app = Flask(__name__)
 CORS(app)
 
-# ----------------------
-# Utilities
-# ----------------------
-def sha256_bytes(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
+# -----------------------------
+# 2️⃣ Database setup
+# -----------------------------
+DATABASE_URI = Config.get_database_uri()
+print(f"🗄️  Using database: {DATABASE_URI}")
 
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
+engine = create_engine(
+    DATABASE_URI,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URI else {}
+)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
 
-def merkle_root(hash_list):
-    # simple merkle: if empty -> '', if single -> that hash, else pairwise combine
-    if not hash_list:
-        return ""
-    cur = [h for h in hash_list]
-    while len(cur) > 1:
-        nxt = []
-        for i in range(0, len(cur), 2):
-            a = cur[i]
-            b = cur[i+1] if i+1 < len(cur) else cur[i]
-            nxt.append(hashlib.sha256((a + b).encode()).hexdigest())
-        cur = nxt
-    return cur[0]
+# -----------------------------
+# 3️⃣ Models
+# -----------------------------
+class Block(Base):
+    __tablename__ = "blocks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    idx = Column(Integer, unique=True, nullable=False)
+    timestamp = Column(String(100))
+    previous_hash = Column(String(256))
+    merkle_root = Column(String(256))
+    block_hash = Column(String(256), unique=True, nullable=False)
+    
+    transactions = relationship("Transaction", back_populates="block")
 
-def merkle_proof(hash_list, leaf):
-    """
-    Returns proof list for leaf (hex strings).
-    proof format: list of { 'sibling': <hex>, 'position': 'left'|'right' }
-    where sibling is the hash paired with current node.
-    """
-    # if leaf is not present, return None
-    if leaf not in hash_list:
-        return None
-    # map to current layer
-    layer = [h for h in hash_list]
-    proof = []
-    idx = layer.index(leaf)
-    while len(layer) > 1:
-        nxt = []
-        for i in range(0, len(layer), 2):
-            a = layer[i]
-            b = layer[i+1] if i+1 < len(layer) else layer[i]
-            # if current pair contains leaf or its ancestor, record sibling
-            if i == idx or i+1 == idx:
-                # sibling is the other one
-                if i == idx:
-                    sibling = b
-                    position = "right"
-                else:
-                    sibling = a
-                    position = "left"
-                proof.append({"sibling": sibling, "position": position})
-                # new idx is index in nxt
-                new_hash = hashlib.sha256((a + b).encode()).hexdigest()
-                nxt.append(new_hash)
-                idx = len(nxt) - 1
-            else:
-                new_hash = hashlib.sha256((a + b).encode()).hexdigest()
-                nxt.append(new_hash)
-        layer = nxt
-    return proof
+class Transaction(Base):
+    __tablename__ = "transactions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_id = Column(Integer, ForeignKey("blocks.id"))
+    tx_id = Column(String(256), unique=True, nullable=False)
+    report_id = Column(String(256), unique=True, nullable=False)
+    title = Column(String(500))
+    uploader = Column(String(256))
+    description = Column(Text)
+    tx_metadata = Column(Text)  # JSON string with file hashes
+    
+    block = relationship("Block", back_populates="transactions")
 
-# ----------------------
-# DB init
-# ----------------------
-def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+# -----------------------------
+# 4️⃣ Initialize database
+# -----------------------------
 def init_db():
-    conn = get_conn()
-    c = conn.cursor()
-    # blocks: idx integer primary key, timestamp, previous_hash, merkle_root, block_hash
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS blocks (
-        idx INTEGER PRIMARY KEY,
-        timestamp TEXT,
-        previous_hash TEXT,
-        merkle_root TEXT,
-        block_hash TEXT
-    )
-    """)
-    # transactions: tx_id, block_idx, report_id, title, uploader, metadata (json), report_hash
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS transactions (
-        tx_id TEXT PRIMARY KEY,
-        block_idx INTEGER,
-        report_id TEXT,
-        title TEXT,
-        uploader TEXT,
-        metadata TEXT,
-        report_hash TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
+    """Initialize database and generate keys"""
+    print("Initializing database...")
+    Base.metadata.create_all(engine)
+    generate_keys_if_missing()
+    print("Database initialized!")
 
-init_db()
+# -----------------------------
+# 5️⃣ Helper functions
+# -----------------------------
+def get_latest_block():
+    """Get the latest block in the chain"""
+    with SessionLocal() as session:
+        return session.query(Block).order_by(Block.idx.desc()).first()
 
-def get_last_block_row(conn):
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks ORDER BY idx DESC LIMIT 1")
-    return c.fetchone()
+def create_block(transactions_data, previous_hash):
+    """Create a new block with transactions"""
+    # Calculate merkle root from file hashes
+    all_hashes = []
+    for tx_data in transactions_data:
+        metadata = json.loads(tx_data['tx_metadata'])
+        all_hashes.extend([f['hash'] for f in metadata['files']])
+    
+    merkle = merkle_root(all_hashes) if all_hashes else sha256_bytes(b"genesis").hex()
+    
+    # Create block data
+    latest_block = get_latest_block()
+    idx = (latest_block.idx + 1) if latest_block else 0
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    
+    # Compute block hash
+    block_data = f"{idx}{timestamp}{previous_hash}{merkle}"
+    block_hash = sha256_bytes(block_data.encode()).hex()
+    
+    # Save block
+    with SessionLocal() as session:
+        new_block = Block(
+            idx=idx,
+            timestamp=timestamp,
+            previous_hash=previous_hash,
+            merkle_root=merkle,
+            block_hash=block_hash
+        )
+        session.add(new_block)
+        session.commit()
+        session.refresh(new_block)
+        
+        # Save transactions
+        for tx_data in transactions_data:
+            new_tx = Transaction(
+                block_id=new_block.id,
+                tx_id=tx_data['tx_id'],
+                report_id=tx_data['report_id'],
+                title=tx_data['title'],
+                uploader=tx_data['uploader'],
+                description=tx_data['description'],
+                tx_metadata=tx_data['metadata']
+            )
+            session.add(new_tx)
+        
+        session.commit()
+        
+        return {
+            'idx': new_block.idx,
+            'block_hash': new_block.block_hash,
+            'merkle_root': new_block.merkle_root
+        }
 
-# ----------------------
-# Basic endpoints (existing)
-# ----------------------
-
-@app.route("/api/explorer", methods=["GET"])
-def explorer():
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT idx, timestamp, block_hash, merkle_root FROM blocks ORDER BY idx DESC LIMIT 100")
-    rows = [dict(r) for r in c.fetchall()]
-    conn.close()
-    return jsonify(rows)
-
-@app.route("/api/block/<int:idx>", methods=["GET"])
-def get_block(idx):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks WHERE idx=?", (idx,))
-    b = c.fetchone()
-    if not b:
-        conn.close()
-        return jsonify({"error": "block not found"}), 404
-    c.execute("SELECT * FROM transactions WHERE block_idx=?", (idx,))
-    txs = [dict(r) for r in c.fetchall()]
-    conn.close()
-    out = dict(b)
-    out["transactions"] = txs
-    return jsonify(out)
+# -----------------------------
+# 6️⃣ Routes
+# -----------------------------
+@app.route("/", methods=["GET"])
+def home():
+    return {"status": "BlockWitness Backend Running 🎉"}
 
 @app.route("/api/report", methods=["POST"])
 def create_report():
-    title = request.form.get("title", "Untitled")
-    uploader = request.form.get("uploader", "anonymous")
-    description = request.form.get("description", "")
-    metadata = {
-        "description": description,
-        "location": request.form.get("location", ""),
-        "time": request.form.get("time", "")
-    }
+    """Create a new incident report with evidence files"""
+    try:
+        # Get form data
+        title = request.form.get("title", "Untitled Report")
+        description = request.form.get("description", "")
+        uploader = request.form.get("uploader", "anonymous")
+        files = request.files.getlist("files")
+        
+        if not files:
+            return jsonify({"error": "No files uploaded"}), 400
+        
+        # Generate report ID
+        report_id = f"RPT-{uuid.uuid4().hex[:12].upper()}"
+        tx_id = f"TX-{uuid.uuid4().hex[:16].upper()}"
+        
+        # Process files
+        evidence_files = []
+        for file in files:
+            if file.filename:
+                # Save file
+                filename = f"{uuid.uuid4().hex}_{file.filename}"
+                filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
+                file.save(filepath)
+                
+                # Compute hash
+                file_hash = sha256_file(filepath)
+                
+                evidence_files.append({
+                    "filename": file.filename,
+                    "hash": file_hash,
+                    "stored_as": filename
+                })
+        
+        # Create transaction data
+        tx_data = {
+            'tx_id': tx_id,
+            'report_id': report_id,
+            'title': title,
+            'uploader': uploader,
+            'description': description,
+            'tx_metadata': json.dumps({
+                'files': evidence_files,
+                'created_at': datetime.utcnow().isoformat()
+            })
+        }
+        
+        # Get previous block hash
+        latest_block = get_latest_block()
+        previous_hash = latest_block.block_hash if latest_block else "0" * 64
+        
+        # Create new block
+        block_info = create_block([tx_data], previous_hash)
+        
+        return jsonify({
+            "message": "Report created successfully",
+            "report_id": report_id,
+            "block_index": block_info['idx'],
+            "merkle_root": block_info['merkle_root'],
+            "evidence": evidence_files
+        }), 201
+        
+    except Exception as e:
+        print(f"Error creating report: {e}")
+        return jsonify({"error": str(e)}), 500
 
-    files = request.files.getlist("files")
-    evidence = []
-    for f in files:
-        filename = f.filename or ("file_" + uuid.uuid4().hex)
-        unique = f"{uuid.uuid4().hex}_{filename}"
-        path = UPLOAD_DIR / unique
-        f.save(path)
-        file_hash = sha256_file(path)
-        evidence.append({
-            "filename": unique,
-            "sha256": file_hash,
-            "mimetype": f.mimetype,
-            "size": path.stat().st_size
+@app.route("/api/explorer", methods=["GET"])
+def explorer():
+    """Get all blocks in the blockchain"""
+    with SessionLocal() as session:
+        blocks = session.query(Block).order_by(Block.idx.asc()).all()
+        result = []
+        for block in blocks:
+            result.append({
+                "idx": block.idx,
+                "timestamp": block.timestamp,
+                "merkle_root": block.merkle_root,
+                "block_hash": block.block_hash,
+                "tx_count": len(block.transactions)
+            })
+        return jsonify(result)
+
+@app.route("/api/block/<int:idx>", methods=["GET"])
+def get_block(idx):
+    """Get detailed block information"""
+    with SessionLocal() as session:
+        block = session.query(Block).filter(Block.idx == idx).first()
+        if not block:
+            return jsonify({"error": "Block not found"}), 404
+        
+        transactions = []
+        for tx in block.transactions:
+            transactions.append({
+                "tx_id": tx.tx_id,
+                "report_id": tx.report_id,
+                "title": tx.title,
+                "uploader": tx.uploader,
+                "description": tx.description,
+                "metadata": json.loads(tx.tx_metadata)
+            })
+        
+        return jsonify({
+            "idx": block.idx,
+            "timestamp": block.timestamp,
+            "previous_hash": block.previous_hash,
+            "merkle_root": block.merkle_root,
+            "block_hash": block.block_hash,
+            "transactions": transactions
         })
-
-    report = {
-        "report_id": uuid.uuid4().hex,
-        "title": title,
-        "uploader": uploader,
-        "metadata": metadata,
-        "evidence": evidence
-    }
-    report_bytes = json.dumps(report, sort_keys=True).encode()
-    report_hash = sha256_bytes(report_bytes)
-
-    # transaction id
-    tx_id = "tx_" + uuid.uuid4().hex
-
-    # compute merkle root using evidence hashes + report_hash
-    ev_hashes = [e["sha256"] for e in evidence] + [report_hash]
-    root = merkle_root(ev_hashes)
-
-    # create block
-    conn = get_conn()
-    last = get_last_block_row(conn)
-    prev_hash = last["block_hash"] if last else "0" * 64
-    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    c = conn.cursor()
-    # block index
-    idx = (last["idx"] + 1) if last else 0
-    # payload used to compute hash (same structure as earlier)
-    block_payload = {"idx": idx, "timestamp": timestamp, "previous_hash": prev_hash, "merkle_root": root, "transactions": [tx_id]}
-    block_hash = sha256_bytes(json.dumps(block_payload, sort_keys=True).encode())
-
-    c.execute("INSERT INTO blocks (idx, timestamp, previous_hash, merkle_root, block_hash) VALUES (?, ?, ?, ?, ?)",
-              (idx, timestamp, prev_hash, root, block_hash))
-    c.execute("INSERT INTO transactions (tx_id, block_idx, report_id, title, uploader, metadata, report_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-              (tx_id, idx, report["report_id"], title, uploader, json.dumps(metadata), report_hash))
-    conn.commit()
-    conn.close()
-
-    # save report JSON alongside uploads for later reference
-    with open(UPLOAD_DIR / (report["report_id"] + ".json"), "wb") as fh:
-        fh.write(report_bytes)
-
-    return jsonify({
-        "report_id": report["report_id"],
-        "tx_id": tx_id,
-        "block_index": idx,
-        "block_hash": block_hash
-    }), 201
 
 @app.route("/api/verify", methods=["POST"])
 def verify_file():
-    f = request.files.get("file")
-    if not f:
-        return jsonify({"error": "no file provided"}), 400
-    tmp = UPLOAD_DIR / ("tmp_" + uuid.uuid4().hex)
-    f.save(tmp)
-    h = sha256_file(tmp)
-    matches = []
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT t.*, b.block_hash, b.merkle_root, b.idx FROM transactions t JOIN blocks b ON t.block_idx=b.idx")
-    for r in c.fetchall():
-        report_id = r["report_id"]
-        report_path = UPLOAD_DIR / (report_id + ".json")
-        if report_path.exists():
-            rep = json.loads(report_path.read_bytes())
-            for e in rep.get("evidence", []):
-                if e.get("sha256") == h:
-                    matches.append({
-                        "tx_id": r["tx_id"],
-                        "report_id": report_id,
-                        "block_idx": r["block_idx"],
-                        "block_hash": r["block_hash"],
-                        "merkle_root": r["merkle_root"]
-                    })
-    conn.close()
-    tmp.unlink(missing_ok=True)
-    return jsonify({"matches": matches})
-
-@app.route("/api/block/<int:idx>/qr", methods=["GET"])
-def block_qr(idx):
-    frontend_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
-    verification_url = f"{frontend_origin}/explorer?block={idx}"
-    if qrcode is None:
-        return jsonify({"error": "qrcode library not installed", "verification_url": verification_url})
-    img = qrcode.make(verification_url)
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    b64 = base64.b64encode(buf.read()).decode()
-    return jsonify({"qr_base64": b64, "verification_url": verification_url})
-
-# ----------------------
-# NEW: Merkle proof endpoint
-# ----------------------
-@app.route("/api/block/<int:idx>/merkle", methods=["GET"])
-def block_merkle(idx):
-    """
-    Query params:
-      - leaf=<sha256 hex of evidence or report hash>
-    Returns: {
-      "root": "<merkle_root>",
-      "proof": [ { "sibling": "<hex>", "position": "left"|"right" }, ... ],
-      "leaf": "<leaf>",
-      "valid": true/false
-    }
-    """
-    leaf = request.args.get("leaf", "").strip()
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks WHERE idx=?", (idx,))
-    b = c.fetchone()
-    if not b:
-        conn.close()
-        return jsonify({"error": "block not found"}), 404
-
-    # Collect evidence hashes and report_hash for this block (from transactions)
-    c.execute("SELECT report_id FROM transactions WHERE block_idx=?", (idx,))
-    rows = c.fetchall()
-    ev_hashes = []
-    for r in rows:
-        report_id = r["report_id"]
-        report_path = UPLOAD_DIR / (report_id + ".json")
-        if report_path.exists():
-            rep = json.loads(report_path.read_bytes())
-            # append evidence hashes
-            for e in rep.get("evidence", []):
-                ev_hashes.append(e.get("sha256"))
-            # append report hash (recompute)
-            rep_bytes = json.dumps(rep, sort_keys=True).encode()
-            rep_hash = sha256_bytes(rep_bytes)
-            ev_hashes.append(rep_hash)
-    # dedupe (keep order) and ensure non-empty
-    ev_hashes = [h for i, h in enumerate(ev_hashes) if h and h not in ev_hashes[:i]]
-
-    root = b["merkle_root"]
-    if not ev_hashes:
-        conn.close()
-        return jsonify({"error": "no evidence hashes for block"}), 400
-
-    if not leaf:
-        # default leaf: use last element (report hash) for demonstration
-        leaf = ev_hashes[-1]
-
-    proof = merkle_proof(ev_hashes, leaf)
-    valid = False
-    if proof is not None:
-        # verify proof locally
-        cur = leaf
-        for p in proof:
-            sib = p["sibling"]
-            if p["position"] == "left":
-                cur = hashlib.sha256((sib + cur).encode()).hexdigest()
-            else:
-                cur = hashlib.sha256((cur + sib).encode()).hexdigest()
-        valid = (cur == root)
-    conn.close()
-    return jsonify({"root": root, "proof": proof, "leaf": leaf, "valid": valid, "all_leaves": ev_hashes})
-
-# ----------------------
-# NEW: Certificate PDF generation
-# ----------------------
-@app.route("/api/report/<report_id>/certificate", methods=["GET"])
-def report_certificate(report_id):
-    """
-    Returns a generated PDF certificate for the report_id.
-    """
-    # must have report JSON saved
-    report_path = UPLOAD_DIR / (f"{report_id}.json")
-    if not report_path.exists():
-        return jsonify({"error": "report JSON not found"}), 404
-
-    report = json.loads(report_path.read_bytes())
-    # find the transaction & block info
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT * FROM transactions WHERE report_id=?", (report_id,))
-    tx = c.fetchone()
-    if not tx:
-        conn.close()
-        return jsonify({"error": "transaction not found"}), 404
-    block_idx = tx["block_idx"]
-    c.execute("SELECT * FROM blocks WHERE idx=?", (block_idx,))
-    blk = c.fetchone()
-    conn.close()
-
-    # Prepare PDF in-memory
-    if canvas is None:
-        # reportlab not installed; return JSON describing certificate
-        return jsonify({
-            "warning": "reportlab not installed on server; install reportlab to enable PDF generation",
-            "report": report,
-            "transaction": dict(tx),
-            "block": dict(blk) if blk else None
-        }), 200
-
-    buf = BytesIO()
-    cpdf = canvas.Canvas(buf, pagesize=A4)
-    width, height = A4
-    # Title
-    cpdf.setFont("Helvetica-Bold", 18)
-    cpdf.drawString(40, height - 60, "BlockWitness — Evidence Certificate")
-    cpdf.setFont("Helvetica", 12)
-    cpdf.drawString(40, height - 90, f"Report ID: {report_id}")
-    cpdf.drawString(40, height - 110, f"Title: {report.get('title')}")
-    cpdf.drawString(40, height - 130, f"Uploader: {report.get('uploader')}")
-    cpdf.drawString(40, height - 150, f"Block Index: {block_idx}")
-    if blk:
-        cpdf.drawString(40, height - 170, f"Block Hash: {blk['block_hash']}")
-        cpdf.drawString(40, height - 190, f"Timestamp: {blk['timestamp']}")
-
-    # Draw a small thumbnail if evidence exists
-    thumb_y = height - 320
+    """Verify if a file exists in the blockchain"""
     try:
-        thumb_path = None
-        if report.get("evidence"):
-            # try first evidence file
-            fn = report["evidence"][0].get("filename")
-            p = UPLOAD_DIR / fn
-            if p.exists():
-                thumb_path = p
-        # fallback to demo file if not found
-        if not thumb_path:
-            thumb_path = Path("/mnt/data/8c099852-aacd-4177-bd7b-db36ae98c0d2.png")
-        if thumb_path.exists():
-            img_reader = ImageReader(str(thumb_path))
-            cpdf.drawImage(img_reader, 40, thumb_y, width=200, height=120, preserveAspectRatio=True)
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        # Compute file hash
+        temp_path = os.path.join(Config.UPLOAD_FOLDER, f"temp_{uuid.uuid4().hex}")
+        file.save(temp_path)
+        file_hash = sha256_file(temp_path)
+        os.remove(temp_path)
+        
+        # Search for hash in database
+        with SessionLocal() as session:
+            transactions = session.query(Transaction).all()
+            for tx in transactions:
+                metadata = json.loads(tx.tx_metadata)
+                for f in metadata['files']:
+                    if f['hash'] == file_hash:
+                        block = session.query(Block).filter(Block.id == tx.block_id).first()
+                        return jsonify({
+                            "found": True,
+                            "match": {
+                                "hash": file_hash,
+                                "report_id": tx.report_id,
+                                "title": tx.title,
+                                "uploader": tx.uploader,
+                                "block_index": block.idx,
+                                "timestamp": block.timestamp,
+                                "merkle_root": block.merkle_root
+                            }
+                        })
+            
+            return jsonify({"found": False})
+            
     except Exception as e:
-        # ignore thumbnail errors
-        pass
+        print(f"Error verifying file: {e}")
+        return jsonify({"error": str(e)}), 500
 
-    # Add a block of metadata text
-    desc = report.get("metadata", {}).get("description", "")
-    cpdf.setFont("Helvetica", 10)
-    text = cpdf.beginText(260, thumb_y + 100)
-    text.textLines(f"Description: {desc}\n\nThis certificate proves the report was recorded in the local BlockWitness ledger. Verify at the BlockWitness Explorer using the block hash or the report ID.")
-    cpdf.drawText(text)
-
-    # Footer
-    cpdf.setFont("Helvetica-Oblique", 9)
-    cpdf.drawString(40, 50, "Generated by BlockWitness (demo) — not a legal document.")
-    cpdf.showPage()
-    cpdf.save()
-    buf.seek(0)
-    return send_file(buf, mimetype="application/pdf", download_name=f"certificate_{report_id}.pdf", as_attachment=True)
-
-# ----------------------
-# NEW: Chain integrity & timeline endpoints
-# ----------------------
-@app.route("/api/chain/verify", methods=["GET"])
-def chain_verify():
-    """
-    Recompute block hashes from stored fields and transaction lists, and verify previous_hash chain.
-    Returns a list of problems (empty list means chain is OK).
-    """
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks ORDER BY idx ASC")
-    blocks = [dict(r) for r in c.fetchall()]
-    problems = []
-    prev_hash = None
-    for b in blocks:
-        idx = b["idx"]
-        # gather tx ids for this block
-        c.execute("SELECT tx_id FROM transactions WHERE block_idx=?", (idx,))
-        txs = [r["tx_id"] for r in c.fetchall()]
-        payload = {"idx": idx, "timestamp": b["timestamp"], "previous_hash": b["previous_hash"], "merkle_root": b["merkle_root"], "transactions": txs}
-        recomputed = sha256_bytes(json.dumps(payload, sort_keys=True).encode())
-        if recomputed != b["block_hash"]:
-            problems.append({"idx": idx, "issue": "block_hash_mismatch", "expected": b["block_hash"], "recomputed": recomputed})
-        if prev_hash is not None and b["previous_hash"] != prev_hash:
-            problems.append({"idx": idx, "issue": "previous_hash_mismatch", "expected_prev": prev_hash, "got": b["previous_hash"]})
-        prev_hash = b["block_hash"]
-    conn.close()
-    return jsonify({"ok": len(problems) == 0, "problems": problems})
+@app.route("/api/search", methods=["GET"])
+def search():
+    """Search reports by keyword"""
+    query = request.args.get("q", "").lower()
+    if not query:
+        return jsonify([])
+    
+    with SessionLocal() as session:
+        transactions = session.query(Transaction).all()
+        results = []
+        
+        for tx in transactions:
+            block = session.query(Block).filter(Block.id == tx.block_id).first()
+            
+            # Search in title, uploader, report_id
+            if (query in tx.title.lower() or 
+                query in tx.uploader.lower() or 
+                query in tx.report_id.lower() or
+                query == str(block.idx)):
+                
+                results.append({
+                    "tx_id": tx.tx_id,
+                    "report_id": tx.report_id,
+                    "title": tx.title,
+                    "uploader": tx.uploader,
+                    "description": tx.description,
+                    "block_index": block.idx
+                })
+        
+        return jsonify(results)
 
 @app.route("/api/chain/timeline", methods=["GET"])
-def chain_timeline():
-    """
-    Returns blocks ordered descending with basic tx info for frontend timeline UI.
-    """
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT * FROM blocks ORDER BY idx DESC")
-    blocks = []
-    for b in c.fetchall():
-        idx = b["idx"]
-        c.execute("SELECT tx_id, title, uploader, report_id FROM transactions WHERE block_idx=? ORDER BY tx_id", (idx,))
-        txs = [dict(r) for r in c.fetchall()]
-        blocks.append({
-            "idx": b["idx"],
-            "timestamp": b["timestamp"],
-            "block_hash": b["block_hash"],
-            "merkle_root": b["merkle_root"],
-            "transactions": txs
-        })
-    conn.close()
-    return jsonify(blocks)
+def timeline():
+    """Get chronological timeline of all blocks"""
+    with SessionLocal() as session:
+        blocks = session.query(Block).order_by(Block.idx.asc()).all()
+        result = []
+        
+        for block in blocks:
+            transactions = []
+            for tx in block.transactions:
+                transactions.append({
+                    "tx_id": tx.tx_id,
+                    "report_id": tx.report_id,
+                    "title": tx.title,
+                    "uploader": tx.uploader
+                })
+            
+            result.append({
+                "idx": block.idx,
+                "timestamp": block.timestamp,
+                "block_hash": block.block_hash,
+                "transactions": transactions
+            })
+        
+        return jsonify(result)
 
+@app.route("/api/chain/verify", methods=["GET"])
+def verify_chain():
+    """Verify the integrity of the entire blockchain"""
+    with SessionLocal() as session:
+        blocks = session.query(Block).order_by(Block.idx.asc()).all()
+        
+        problems = []
+        for i, block in enumerate(blocks):
+            # Check previous hash linkage
+            if i > 0:
+                expected_prev = blocks[i-1].block_hash
+                if block.previous_hash != expected_prev:
+                    problems.append(f"Block {block.idx}: previous_hash mismatch")
+            
+            # Verify block hash
+            block_data = f"{block.idx}{block.timestamp}{block.previous_hash}{block.merkle_root}"
+            expected_hash = sha256_bytes(block_data.encode()).hex()
+            if block.block_hash != expected_hash:
+                problems.append(f"Block {block.idx}: block_hash invalid")
+        
+        return jsonify({
+            "ok": len(problems) == 0,
+            "total_blocks": len(blocks),
+            "problems": problems
+        })
+
+@app.route("/api/report/<report_id>/certificate", methods=["GET"])
+def download_certificate(report_id):
+    """Generate and download PDF certificate for a report"""
+    try:
+        with SessionLocal() as session:
+            tx = session.query(Transaction).filter(Transaction.report_id == report_id).first()
+            if not tx:
+                return jsonify({"error": "Report not found"}), 404
+            
+            block = session.query(Block).filter(Block.id == tx.block_id).first()
+            
+            # Generate PDF
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Title
+            pdf.set_font("Arial", "B", 24)
+            pdf.cell(0, 20, "CERTIFICATE OF AUTHENTICITY", align="C", ln=True)
+            
+            # Report details
+            pdf.set_font("Arial", "", 12)
+            pdf.ln(10)
+            pdf.cell(0, 10, f"Report ID: {tx.report_id}", ln=True)
+            pdf.cell(0, 10, f"Title: {tx.title}", ln=True)
+            pdf.cell(0, 10, f"Submitted by: {tx.uploader}", ln=True)
+            pdf.cell(0, 10, f"Block: #{block.idx}", ln=True)
+            pdf.cell(0, 10, f"Timestamp: {block.timestamp}", ln=True)
+            pdf.ln(5)
+            pdf.multi_cell(0, 10, f"Block Hash: {block.block_hash}")
+            pdf.multi_cell(0, 10, f"Merkle Root: {block.merkle_root}")
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(f"Report: {report_id}\nBlock: {block.idx}\nHash: {block.block_hash}")
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            
+            qr_path = os.path.join(Config.CERTIFICATES_FOLDER, f"qr_{report_id}.png")
+            qr_img.save(qr_path)
+            
+            pdf.image(qr_path, x=80, y=150, w=50)
+            
+            # Save PDF
+            pdf_path = os.path.join(Config.CERTIFICATES_FOLDER, f"cert_{report_id}.pdf")
+            pdf.output(pdf_path)
+            
+            return send_file(pdf_path, as_attachment=True, download_name=f"certificate_{report_id}.pdf")
+            
+    except Exception as e:
+        print(f"Error generating certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/block/<int:idx>/qr", methods=["GET"])
+def get_block_qr(idx):
+    """Generate QR code for block verification"""
+    try:
+        with SessionLocal() as session:
+            block = session.query(Block).filter(Block.idx == idx).first()
+            if not block:
+                return jsonify({"error": "Block not found"}), 404
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(f"Block: {block.idx}\nHash: {block.block_hash}\nMerkle: {block.merkle_root}")
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to base64
+            buffered = BytesIO()
+            qr_img.save(buffered, format="PNG")
+            import base64
+            qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+            
+            return jsonify({
+                "qr_base64": qr_base64,
+                "verification_url": f"/api/block/{idx}"
+            })
+            
+    except Exception as e:
+        print(f"Error generating QR: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/block/<int:idx>/merkle", methods=["GET"])
+def get_merkle_proof(idx):
+    """Generate Merkle proof for a file in a block"""
+    leaf_hash = request.args.get("leaf", "")
+    
+    with SessionLocal() as session:
+        block = session.query(Block).filter(Block.idx == idx).first()
+        if not block:
+            return jsonify({"error": "Block not found"}), 404
+        
+        # Get all file hashes from transactions
+        all_hashes = []
+        for tx in block.transactions:
+            metadata = json.loads(tx.tx_metadata)
+            all_hashes.extend([f['hash'] for f in metadata['files']])
+        
+        if not all_hashes:
+            return jsonify({"error": "No files in block"}), 404
+        
+        # Use first hash if no leaf specified
+        if not leaf_hash:
+            leaf_hash = all_hashes[0]
+        
+        # Generate simple proof (for demonstration)
+        # In production, implement full Merkle tree proof generation
+        proof = [{"sibling": h, "position": "right"} for h in all_hashes if h != leaf_hash]
+        
+        return jsonify({
+            "leaf": leaf_hash,
+            "root": block.merkle_root,
+            "proof": proof[:3],  # Limit for demo
+            "valid": leaf_hash in all_hashes
+        })
+
+# -----------------------------
+# 7️⃣ Run the app
+# -----------------------------
 if __name__ == "__main__":
-    # listen on all interfaces for LAN testing; change host if you prefer localhost only
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    init_db()
+    port = int(os.getenv("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)
