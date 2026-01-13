@@ -1,170 +1,124 @@
-BlockWitness 🚀
+# BlockWitness 🚀
 
 BlockWitness is a full-stack blockchain web application that allows users to upload files, generate verifiable reports, view blockchain proofs (like Merkle paths), and interactively verify integrity and authenticity.
-Built with a Python Flask backend and a React + Vite frontend, it’s ideal for learning and demonstrating basic blockchain proof techniques.
 
-📌 Table of Contents
+Built with a **Python Flask (Waitress)** backend connected to **Supabase (PostgreSQL)** and a **React + Vite** frontend.
 
-🧠 What is BlockWitness
+## 📌 Table of Contents
 
-🛠️ Features
+- [What is BlockWitness](#-what-is-blockwitness)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Prerequisites](#-prerequisites)
+- [Quick Start (Local Setup)](#-quick-start-local-setup)
+- [Environment Configuration](#-environment-configuration)
+- [Deployment](#-deployment)
+- [License](#-license)
 
-🧩 Architecture
-
-🚀 Quick Start
-
-📁 Folder Structure
-
-📊 How it Works
-
-🧪 Testing Locally
-
-📦 Deployment
-
-📜 License
-
-🧠 What is BlockWitness?
+## 🧠 What is BlockWitness?
 
 BlockWitness is a decentralized-style webapp that lets users:
-
 ✅ Upload any file
 ✅ Create a cryptographically anchored “report”
+✅ Store transactions securely in **Supabase**
 ✅ Explore Merkle proofs & blockchain-style block chains
 ✅ Verify file integrity through proofs
 ✅ Download PDF reports with QR codes
-✔ Everything works offline on localhost
 
-It’s a perfect project for experimenting with blockchain proof structures and file immutability.
+## 🛠️ Features
 
-🛠️ Key Features
+- **Supabase Integration**: Robust PostgreSQL database storage for blocks and transactions.
+- **Merkle Chain Explorer**: Browse created blocks and proofs visually.
+- **PDF Reports with QR**: Generate printable reports for offline verification.
+- **File Verification**: Validate any uploaded file against the blockchain ledger.
+- **Timeline View**: See sequencing of uploaded items.
+- **Windows Optimized**: Uses `waitress` to run stably on Windows environments.
 
-🔗 Merkle Chain Explorer – Browse created blocks and proofs
+## 🧩 Tech Stack
 
-📄 PDF Reports with QR – Generate printable reports
+| Component | Technology |
+|-----------|------------|
+| **Backend** | Python 3.14+, Flask, Waitress (Server), SQLAlchemy |
+| **Database** | Supabase (PostgreSQL) |
+| **Frontend** | React, Vite |
+| **Utilities** | ReportLab (PDF), QRCode, Dotenv |
 
-🔍 File Verification – Validate any uploaded file
+## 📋 Prerequisites
 
-🪪 Timeline View – See sequencing of uploaded items
+Before running the project, ensure you have the following installed:
 
-🔐 Chain Verification Tools – Confirm on-chain integrity
+1.  **Python 3.10+** (tested on 3.14)
+2.  **Node.js & npm** (LTS version recommended)
+3.  **Supabase Account**: You need a project URL and Database Password.
 
-🧪 Offline/localhost support
-(All features run locally for development)
+## 🚀 Quick Start (Local Setup)
 
-🧩 Architecture
-Component	Framework/Tech
-Backend	Python + Flask
-API	REST endpoints
-Frontend	React + Vite
-PDF & QR Generation	ReportLab, qrcode
-Deployment	Render / Docker (optional)
-
-The backend handles file upload, Merkle proof generation, plaintext hashing, PDF creation, and serving data to the frontend. The frontend provides an interactive UI to create, view, and verify blockchain proof artifacts.
-
-🚀 Quick Start
-1. Clone the repository
+### 1. Clone the Repository
+```bash
 git clone https://github.com/PAVAN-ENG-SIT/blockwitness.git
 cd blockwitness
+```
 
-2. Backend Setup (Flask)
+### 2. Configure Environment (`.env`)
+Create a `.env` file in the **root directory** of the project (`blockwitness/.env`).
+Add your Supabase details (use port **6543** for IPv6/Connection Pooling support if needed):
+
+```env
+# Backend Configuration
+USE_POSTGRES=true
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:6543/postgres?connect_timeout=10
+PORT=8000
+
+# Frontend Configuration
+VITE_API_URL=/api
+```
+
+### 3. Backend Setup (Python)
+Open a terminal in the `backend` folder:
+
+```bash
 cd backend
+# Create virtual environment (optional but recommended)
 python -m venv venv
-# Activate venv
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
+# Activate venv:
+# Windows: venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt
-# or manually:
-pip install flask flask-cors reportlab qrcode[pil]
 
-python app.py
+# Run the server (Windows optimized)
+python run_waitress.py
+```
+*You should see: `Backend running on http://0.0.0.0:8000`*
 
+### 4. Frontend Setup (React)
+Open a **new terminal** in the `frontend` folder:
 
-🟢 Backend will run at: http://127.0.0.1:5001
-
-3. Frontend Setup (React + Vite)
-cd ../frontend
+```bash
+cd frontend
 npm install
 npm run dev
+```
+*You should see: `Local: http://localhost:5000`*
 
+👉 **Open your browser:** [http://localhost:5000](http://localhost:5000)
 
-🟢 Frontend will run at: http://localhost:5173
+## 📊 How It Works
 
-📁 Folder Structure
-/blockwitness
-├── backend/         # Flask API server
-├── frontend/        # React app (Vite)
-├── README.md        # Project overview
-├── Deployment.md    # Deploy notes
-├── Dockerfile       # Optional container config
-├── render.yaml      # Render deployment config
-└── start.sh         # Startup script
+1.  **Upload**: User uploads a file via the frontend.
+2.  **Process**: Backend hashes the file, creates a transaction, and enters it into the Database.
+3.  **Merkle Proof**: A Merkle root is calculated for the block.
+4.  **Verification**: Users can download a PDF validation certificate containing the proof and QR code.
 
-📊 How It Works
-🗂️ File Upload & Report
-
-User uploads a file via the frontend UI.
-
-Backend accepts file, hashes it, and creates a Merkle proof.
-
-A PDF report is generated that includes:
-
-File metadata
-
-Hash values
-
-QR for quick mobile access
-
-Reports can be downloaded or re-verified.
-
-📜 Blockchain Proofs
-
-Each uploaded file becomes a “block” in an offline Merkle chain.
-
-A Merkle path + QR code illustrates proof of existence and integrity.
-
-Users can validate chain integrity with built-in verification tools.
-
-(This is conceptually similar to how blockchain witnesses provide proof of block data, though simplified for educational use.)
-
-🧪 Testing Locally
-
-If you want to test all features:
-
-Start backend
-
-Start frontend
-
-Create a few reports
-
-Try:
-
-Merkle path inspection
-
-Timeline views
-
-Offline chain verification
-
-Downloading PDFs
-
-📦 Deployment
+## 📦 Deployment
 
 You can deploy on platforms like Render, Railway, or Vercel.
 
-✔ Define environment variables in .env
-✔ Configure build scripts for backend and frontend
-✔ Use docker or platform-native deployment
+1.  **Database**: Ensure your `DATABASE_URL` environment variable is set on the cloud provider.
+2.  **Backend**: Command to run: `python run_waitress.py` (or `gunicorn app:app` for Linux).
+3.  **Frontend**: Build command: `npm run build`, Publish directory: `dist`.
 
-(See Deployment.md for details.)
+## 📜 License
 
-📜 License
-
-This project is open source — feel free to explore, improve, and reuse in your own learning and development.
-Add a license section here (MIT, Apache, etc.) as appropriate.
-
-❤️ Contributing
-
-Contributions are welcome!
-Feel free to open issues or submit pull requests.
+This project is open source.
