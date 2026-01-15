@@ -105,7 +105,7 @@ export default function Signup() {
                             label="Full Name"
                             type="text"
                             name="name"
-                            placeholder="John Doe"
+                            placeholder="your name"
                             value={formData.name}
                             onChange={handleChange}
                             required
