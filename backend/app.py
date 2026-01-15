@@ -2,6 +2,7 @@
 import os
 import uuid
 import json
+import traceback
 import qrcode
 from io import BytesIO
 from datetime import datetime
@@ -183,38 +184,48 @@ def create_report():
 
 @app.route("/api/blocks", methods=["GET"])
 def explorer():
-    with SessionLocal() as session:
-        blocks = session.query(Block).order_by(Block.idx.asc()).all()
-        return jsonify([{
-            "idx": b.idx,
-            "timestamp": b.timestamp,
-            "merkle_root": b.merkle_root,
-            "block_hash": b.block_hash,
-            "tx_count": len(b.transactions)
-        } for b in blocks])
+    try:
+        with SessionLocal() as session:
+            blocks = session.query(Block).order_by(Block.idx.asc()).all()
+            return jsonify([{
+                "idx": b.idx,
+                "timestamp": b.timestamp,
+                "merkle_root": b.merkle_root,
+                "block_hash": b.block_hash,
+                "tx_count": len(b.transactions)
+            } for b in blocks])
+    except Exception as e:
+        print(f"❌ Error in /api/blocks: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route("/api/block/<int:idx>", methods=["GET"])
 def get_block(idx):
-    with SessionLocal() as session:
-        block = session.query(Block).filter(Block.idx == idx).first()
-        if not block:
-            return jsonify({"error": "Block not found"}), 404
-        transactions = [{
-            "tx_id": tx.tx_id,
-            "report_id": tx.report_id,
-            "title": tx.title,
-            "uploader": tx.uploader,
-            "description": tx.description,
-            "metadata": json.loads(tx.tx_metadata)
-        } for tx in block.transactions]
-        return jsonify({
-            "idx": block.idx,
-            "timestamp": block.timestamp,
-            "previous_hash": block.previous_hash,
-            "merkle_root": block.merkle_root,
-            "block_hash": block.block_hash,
-            "transactions": transactions
-        })
+    try:
+        with SessionLocal() as session:
+            block = session.query(Block).filter(Block.idx == idx).first()
+            if not block:
+                return jsonify({"error": "Block not found"}), 404
+            transactions = [{
+                "tx_id": tx.tx_id,
+                "report_id": tx.report_id,
+                "title": tx.title,
+                "uploader": tx.uploader,
+                "description": tx.description,
+                "metadata": json.loads(tx.tx_metadata)
+            } for tx in block.transactions]
+            return jsonify({
+                "idx": block.idx,
+                "timestamp": block.timestamp,
+                "previous_hash": block.previous_hash,
+                "merkle_root": block.merkle_root,
+                "block_hash": block.block_hash,
+                "transactions": transactions
+            })
+    except Exception as e:
+        print(f"❌ Error in /api/block/{idx}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route("/api/verify", methods=["POST"])
 def verify_file():
@@ -274,13 +285,18 @@ def search():
 
 @app.route("/api/chain/timeline", methods=["GET"])
 def timeline():
-    with SessionLocal() as session:
-        return jsonify([{
-            "idx": b.idx,
-            "timestamp": b.timestamp,
-            "block_hash": b.block_hash,
-            "transactions": [{"tx_id": t.tx_id, "report_id": t.report_id, "title": t.title, "uploader": t.uploader} for t in b.transactions]
-        } for b in session.query(Block).order_by(Block.idx.asc()).all()])
+    try:
+        with SessionLocal() as session:
+            return jsonify([{
+                "idx": b.idx,
+                "timestamp": b.timestamp,
+                "block_hash": b.block_hash,
+                "transactions": [{"tx_id": t.tx_id, "report_id": t.report_id, "title": t.title, "uploader": t.uploader} for t in b.transactions]
+            } for b in session.query(Block).order_by(Block.idx.asc()).all()])
+    except Exception as e:
+        print(f"❌ Error in /api/chain/timeline: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route("/api/chain/verify", methods=["GET"])
 def verify_chain():
