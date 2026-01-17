@@ -9,16 +9,16 @@ export default function Button({
   className = '',
   ...props
 }) {
-  const baseStyles = 'relative inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group btn-ripple';
+  const baseStyles = 'relative inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-300 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 overflow-hidden group btn-ripple';
 
   const variants = {
-    primary: 'bg-gradient-primary text-white shadow-button hover:shadow-button-hover hover:scale-105 active:scale-95 hover:brightness-110',
-    secondary: 'bg-gradient-secondary text-white shadow-glow-secondary hover:shadow-glow-secondary hover:scale-105 active:scale-95 hover:brightness-110',
-    accent: 'bg-gradient-accent text-white shadow-glow-accent hover:shadow-glow-accent hover:scale-105 active:scale-95 hover:brightness-110',
-    success: 'bg-gradient-success text-white shadow-glow-success hover:shadow-glow-success hover:scale-105 active:scale-95 hover:brightness-110',
-    ghost: 'bg-dark-800/50 hover:bg-gradient-to-r hover:from-primary-500/10 hover:to-secondary-500/10 text-dark-200 backdrop-blur-sm border border-dark-700 hover:border-primary-400 hover:scale-105 active:scale-95',
-    outline: 'border-2 border-primary-500 text-primary-400 hover:bg-primary-900/20 hover:border-primary-600 hover:scale-105 active:scale-95',
-    danger: 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95 hover:brightness-110',
+    primary: 'bg-gradient-primary text-white shadow-button hover:shadow-button-hover hover:scale-105 hover:brightness-110',
+    secondary: 'bg-gradient-secondary text-white shadow-glow-secondary hover:shadow-glow-secondary hover:scale-105 hover:brightness-110',
+    accent: 'bg-gradient-accent text-white shadow-glow-accent hover:shadow-glow-accent hover:scale-105 hover:brightness-110',
+    success: 'bg-gradient-success text-white shadow-glow-success hover:shadow-glow-success hover:scale-105 hover:brightness-110',
+    ghost: 'bg-dark-800/50 hover:bg-gradient-to-r hover:from-primary-500/10 hover:to-secondary-500/10 text-dark-200 backdrop-blur-sm border border-dark-700 hover:border-primary-400 hover:scale-105',
+    outline: 'border-2 border-primary-500 text-primary-400 hover:bg-primary-900/20 hover:border-primary-600 hover:scale-105',
+    danger: 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 hover:brightness-110',
   };
 
   const sizes = {
